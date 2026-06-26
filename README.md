@@ -32,11 +32,42 @@ The system uses:
 
 ## Installation & Setup
 
-1. **Python version:** Ensure you are running Python 3.8+ (tested on Python 3.14).
-2. **Install dependencies:**
-   ```bash
-   pip install opencv-contrib-python numpy pillow scikit-learn
-   ```
+This project uses [uv](https://github.com/astral-sh/uv) as the Python version and package manager to guarantee fast, reproducible environments across platforms.
+
+### 1. Install `uv`
+
+- **Linux & macOS**:
+  ```bash
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  ```
+- **Windows (PowerShell)**:
+  ```powershell
+  powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+  ```
+
+### 2. Set Up Virtual Environment
+
+Set up the project virtual environment with Python 3.14 (or any version 3.8+):
+
+- **Linux & macOS**:
+  ```bash
+  uv venv --python 3.14
+  source .venv/bin/activate
+  ```
+- **Windows (PowerShell/CMD)**:
+  ```powershell
+  uv venv --python 3.14
+  .venv\Scripts\activate
+  ```
+
+### 3. Install Dependencies
+
+Install the required deep learning and image processing dependencies:
+
+- **Linux, macOS, and Windows**:
+  ```bash
+  uv pip install opencv-contrib-python numpy pillow scikit-learn
+  ```
 
 The system will automatically download the required model weights (`face_detection_yunet_2023mar.onnx` and `face_recognition_sface_2021dec.onnx`) during the first run.
 
@@ -66,37 +97,76 @@ The system will automatically download the required model weights (`face_detecti
 
 ## Usage Guide
 
-Run all commands from the workspace root directory.
+Run all commands from the workspace root directory. You can run them by activating the virtual environment first, or by using `uv run`. Both paths are documented below.
 
 ### Phase 1: Student Registration (Enrollment)
 Build the face database by extracting face embeddings for each student in the `dataset` folder:
-```bash
-python Attendance-System/main.py register
-```
+
+- **Linux & macOS**:
+  ```bash
+  # Option A: Active venv
+  python Attendance-System/main.py register
+  
+  # Option B: One-off execution with uv
+  uv run python Attendance-System/main.py register
+  ```
+- **Windows**:
+  ```powershell
+  # Option A: Active venv
+  python Attendance-System\main.py register
+  
+  # Option B: One-off execution with uv
+  uv run python Attendance-System\main.py register
+  ```
 *This processes each directory in `dataset/` (e.g. `Person1`, `Person2`) and generates a serialized `encodings.pkl` database of 128-dimensional vectors.*
 
 ### Phase 2: Identify a Single Face
 Test identification on a single face photograph:
-```bash
-python Attendance-System/main.py recognize-single Attendance-System/dataset/Person1/Monica1.jpeg
-```
+
+- **Linux & macOS**:
+  ```bash
+  # Option A: Active venv
+  python Attendance-System/main.py recognize-single Attendance-System/dataset/Person1/Monica1.jpeg
+  
+  # Option B: One-off execution with uv
+  uv run python Attendance-System/main.py recognize-single Attendance-System/dataset/Person1/Monica1.jpeg
+  ```
+- **Windows**:
+  ```powershell
+  # Option A: Active venv
+  python Attendance-System\main.py recognize-single Attendance-System\dataset\Person1\Monica1.jpeg
+  
+  # Option B: One-off execution with uv
+  uv run python Attendance-System\main.py recognize-single Attendance-System\dataset\Person1\Monica1.jpeg
+  ```
 *Outputs the student's name, Euclidean distance score, and face detection confidence.*
 
 ### Phase 3: Mark Classroom Attendance
 Process a classroom selfie/group photo to headcount and identify present students:
-```bash
-python Attendance-System/main.py attendance <path_to_group_photo>
-```
-Example command:
-```bash
-python Attendance-System/main.py attendance assets/test1.jpeg
-```
+
+- **Linux & macOS**:
+  ```bash
+  # Option A: Active venv
+  python Attendance-System/main.py attendance assets/test1.jpeg
+  
+  # Option B: One-off execution with uv
+  uv run python Attendance-System/main.py attendance assets/test1.jpeg
+  ```
+- **Windows**:
+  ```powershell
+  # Option A: Active venv
+  python Attendance-System\main.py attendance assets\test1.jpeg
+  
+  # Option B: One-off execution with uv
+  uv run python Attendance-System\main.py attendance assets\test1.jpeg
+  ```
+
 This command will:
 1. Detect all faces and print the total headcount.
 2. Cross-reference detected faces against `encodings.pkl`.
 3. Print the list of identified students (e.g., Monica, Chandler, Ross).
 4. Save the names to `Attendance-System/attendance.csv`.
-5. Export a visual verification photo (`Attendance-System/annotated_attendance.jpeg`) showing named bounding boxes (green for recognized students, red for unknowns).
+5. Export a visual verification photo (`Attendance-System/annotated_attendance.jpeg` or `Attendance-System\annotated_attendance.jpeg`) showing named bounding boxes (green for recognized students, red for unknowns).
 
 ---
 
