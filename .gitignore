@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Project Specific (Generated/Downloaded)
+Attendance-System/models/
+Attendance-System/encodings.pkl
+Attendance-System/attendance.csv
+Attendance-System/annotated_attendance.jpeg
+
+# IDEs/Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
