@@ -73,106 +73,66 @@ The system will automatically download the required model weights (`face_detecti
 
 ---
 
-## Project Structure
+### Project Structure
 
 ```
 ├── README.md                           # Project documentation
-├── basicFunctionsOpenCV.py             # OpenCV sanity check script
 └── Attendance-System
-    ├── main.py                         # CLI entry point (register, recognize-single, attendance)
-    ├── encodings.pkl                   # Generated student encodings database
-    ├── attendance.csv                  # Attendance log spreadsheet
-    ├── annotated_attendance.jpeg       # Annotated verification output photo
+    ├── main.py                         # CLI controller
+    ├── encodings.pkl                   # Pickled student encodings database
+    ├── attendance.csv                  # Cumulative attendance spreadsheet
     ├── dataset/                        # Reference photos directory
-    │   ├── Person1/                    # Monica photos
-    │   ├── Person2/                    # Chandler photos
-    │   └── Person3/                    # Ross photos
-    ├── models/                         # ONNX model files (downloaded automatically)
+    │   ├── Monica/                     # Monica reference photos
+    │   ├── Chandler/                   # Chandler reference photos
+    │   └── Ross/                       # Ross reference photos
+    ├── models/                         # ONNX model weights (downloaded automatically)
+    ├── verification/                   # Visual verification proofs (timestamped)
+    │   └── annotated_attendance_DD-MM-YYYY.jpeg
     └── src/
         ├── face_engine.py              # YuNet & SFace core wrappers
-        └── utils.py                    # Downloads, serialisation, and drawing helpers
+        └── utils.py                    # Downloads, serialization, and drawing helpers
 ```
 
 ---
 
 ## Usage Guide
 
-Run all commands from the workspace root directory. You can run them by activating the virtual environment first, or by using `uv run`. Both paths are documented below.
+Run all commands from the workspace root directory using `uv run`.
 
-### Phase 1: Student Registration (Enrollment)
-Build the face database by extracting face embeddings for each student in the `dataset` folder:
+### Step 1: Student Registration (Enrollment)
+Extract face coordinates for each student located in the `dataset/` subfolders:
+```bash
+uv run python Attendance-System/main.py register
+```
+*Creates `encodings.pkl` containing the serialized face representations.*
 
-- **Linux & macOS**:
-  ```bash
-  # Option A: Active venv
-  python Attendance-System/main.py register
-  
-  # Option B: One-off execution with uv
-  uv run python Attendance-System/main.py register
-  ```
-- **Windows**:
-  ```powershell
-  # Option A: Active venv
-  python Attendance-System\main.py register
-  
-  # Option B: One-off execution with uv
-  uv run python Attendance-System\main.py register
-  ```
-*This processes each directory in `dataset/` (e.g. `Person1`, `Person2`) and generates a serialized `encodings.pkl` database of 128-dimensional vectors.*
+### Step 2: Test Face Recognition (Single Image)
+Test the engine against a single image to verify identity matching:
+```bash
+uv run python Attendance-System/main.py recognize-single Attendance-System/dataset/Monica/Monica1.jpeg
+```
+*Outputs: Identified name, Euclidean distance score, and face detection confidence.*
 
-### Phase 2: Identify a Single Face
-Test identification on a single face photograph:
+### Step 3: Run Classroom Attendance
+Process a classroom group photo to headcount students and log attendance:
+```bash
+uv run python Attendance-System/main.py attendance <path_to_group_photo>
+```
+**Example (WSL / Windows)**:
+```bash
+uv run python Attendance-System/main.py attendance /mnt/c/Users/ASUS/Downloads/FriendsLead.webp
+```
 
-- **Linux & macOS**:
-  ```bash
-  # Option A: Active venv
-  python Attendance-System/main.py recognize-single Attendance-System/dataset/Person1/Monica1.jpeg
-  
-  # Option B: One-off execution with uv
-  uv run python Attendance-System/main.py recognize-single Attendance-System/dataset/Person1/Monica1.jpeg
-  ```
-- **Windows**:
-  ```powershell
-  # Option A: Active venv
-  python Attendance-System\main.py recognize-single Attendance-System\dataset\Person1\Monica1.jpeg
-  
-  # Option B: One-off execution with uv
-  uv run python Attendance-System\main.py recognize-single Attendance-System\dataset\Person1\Monica1.jpeg
-  ```
-*Outputs the student's name, Euclidean distance score, and face detection confidence.*
-
-### Phase 3: Mark Classroom Attendance
-Process a classroom selfie/group photo to headcount and identify present students:
-
-- **Linux & macOS**:
-  ```bash
-  # Option A: Active venv
-  python Attendance-System/main.py attendance assets/test1.jpeg
-  
-  # Option B: One-off execution with uv
-  uv run python Attendance-System/main.py attendance assets/test1.jpeg
-  ```
-- **Windows**:
-  ```powershell
-  # Option A: Active venv
-  python Attendance-System\main.py attendance assets\test1.jpeg
-  
-  # Option B: One-off execution with uv
-  uv run python Attendance-System\main.py attendance assets\test1.jpeg
-  ```
-
-This command will:
-1. Detect all faces and print the total headcount.
-2. Cross-reference detected faces against `encodings.pkl`.
-3. Print the list of identified students (e.g., Monica, Chandler, Ross).
-4. Save the names to `Attendance-System/attendance.csv`.
-5. Export a visual verification photo (`Attendance-System/annotated_attendance.jpeg` or `Attendance-System\annotated_attendance.jpeg`) showing named bounding boxes (green for recognized students, red for unknowns).
+This command automatically:
+1. **Detects** all faces present (prints total headcount to console).
+2. **Matches** faces against `encodings.pkl` database (using L2/Euclidean distance threshold of `1.128`).
+3. **Logs** results to `Attendance-System/attendance.csv` (inserts a new column for today's date formatted as `DD-MM-YYYY`, marks `P`/`A` for all registered students, and updates cumulative attendance percentage).
+4. **Saves** annotated visual proof to `Attendance-System/verification/annotated_attendance_DD-MM-YYYY.jpeg` showing green bounding boxes for recognized students and red boxes for unknowns.
 
 ---
 
-## Key Design Decisions & Future Android Porting
+## Key Design Decisions & Portability
 
-* **Embedded Vector Pickling:** Instead of performing linear deep-learning scans on reference images at attendance runtime (which gets slower as database size increases), reference face embeddings are computed *once* during registration and stored in `encodings.pkl`. Live comparisons are fast vector math ($O(1)$ database load), executing in milliseconds.
-* **OpenCV DNN Portability:** We use standard ONNX weights natively supported by OpenCV DNN. This enables trivial migration to mobile environments:
-  * **Option A (API Backend):** Wrap the engine in a Flask/FastAPI REST API. The Android app takes a photo, uploads it via HTTP, and receives attendance results in JSON format.
-  * **Option B (On-Device Mobile Running):** The `.onnx` models can be loaded directly in Java/Kotlin via the OpenCV Android SDK or ONNX Runtime Mobile, using the exact same YuNet/SFace pipeline logic.
+* **Embedded Vector Pickling**: Instead of performing linear deep learning scans on reference images at runtime, embeddings are calculated once and stored in `encodings.pkl`. This speeds up matching into simple vector math executing in milliseconds.
+* **Cumulative Grid Export**: Attendance logs are organized as a spreadsheet matrix rather than a transaction log, keeping track of every registered student and their total attendance percentage over the term.
+* **OpenCV DNN Portability**: The system uses native ONNX weights supported directly by OpenCV DNN. This enables seamless porting to other platforms, such as integrating the backend into a Flask/FastAPI REST API or loading models directly on-device using the OpenCV Android SDK or ONNX Runtime Mobile, using the exact same YuNet/SFace pipeline logic.

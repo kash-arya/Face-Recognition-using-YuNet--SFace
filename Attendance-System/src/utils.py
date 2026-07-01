@@ -58,23 +58,110 @@ def load_encodings(filepath="Attendance-System/encodings.pkl"):
     with open(filepath, 'rb') as f:
         return pickle.load(f)
 
-def save_attendance(present_students, filepath="Attendance-System/attendance.csv"):
-    """Exports a list of present students to a CSV file with date and timestamp."""
+def save_attendance(present_students, filepath="Attendance-System/attendance.csv", database_filepath="Attendance-System/encodings.pkl"):
+    """Exports attendance to a cumulative CSV matrix format with P/A markers and percentages."""
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    file_exists = os.path.exists(filepath)
+    
+    # 1. Load all registered students
+    database = load_encodings(database_filepath)
+    if not database:
+        print("[WARNING] No registered students found in encodings database. Skipping CSV export.")
+        return
+        
+    all_students = sorted(list(database.keys()))
     
     now = datetime.now()
-    date_str = now.strftime("%Y-%m-%d")
-    time_str = now.strftime("%H:%M:%S")
+    date_str = now.strftime("%d-%m-%Y")
     
-    with open(filepath, mode='a', newline='') as f:
-        writer = csv.writer(f)
-        if not file_exists:
-            writer.writerow(["Date", "Time", "Student Name"])
-        for student in present_students:
-            writer.writerow([date_str, time_str, student])
+    rows = []
+    header = []
+    
+    if not os.path.exists(filepath):
+        # Initialize file
+        header = ["Names", date_str, "Percentage of total lectures attended"]
+        rows.append(header)
+        for student in all_students:
+            status = "P" if student in present_students else "A"
+            pct_str = "100.0%" if status == "P" else "0.0%"
+            rows.append([student, status, pct_str])
+    else:
+        # Load existing file
+        with open(filepath, mode='r', newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            rows = list(reader)
             
-    print(f"[INFO] Exported attendance for {len(present_students)} students to {filepath}")
+        if not rows:
+            header = ["Names", date_str, "Percentage of total lectures attended"]
+            rows.append(header)
+        else:
+            header = rows[0]
+            
+        # Determine index of the percentage column
+        pct_col_name = "Percentage of total lectures attended"
+        if pct_col_name in header:
+            pct_col_idx = header.index(pct_col_name)
+        else:
+            pct_col_idx = len(header)
+            header.append(pct_col_name)
+            
+        # Determine index of today's date column
+        if date_str in header:
+            date_col_idx = header.index(date_str)
+            new_col_inserted = False
+        else:
+            # Insert date column right before the percentage column
+            header.insert(pct_col_idx, date_str)
+            date_col_idx = pct_col_idx
+            new_col_inserted = True
+            
+        # Update existing student rows
+        existing_names = set()
+        for row in rows[1:]:
+            if not row or len(row) == 0:
+                continue
+            student_name = row[0]
+            existing_names.add(student_name)
+            
+            # If a new date column was inserted, insert placeholder cell
+            if new_col_inserted:
+                row.insert(date_col_idx, "A")
+                
+            # Set today's presence status
+            if student_name in present_students:
+                row[date_col_idx] = "P"
+            else:
+                row[date_col_idx] = "A"
+                
+        # Append rows for new registered students who are not in the CSV yet
+        for student in all_students:
+            if student not in existing_names:
+                new_row = [student]
+                # Populate each date column up to the percentage column
+                for col_idx in range(1, len(header) - 1):
+                    if col_idx == date_col_idx:
+                        new_row.append("P" if student in present_students else "A")
+                    else:
+                        new_row.append("A") # Absent for past dates
+                new_row.append("") # Placeholder for percentage
+                rows.append(new_row)
+                
+        # Recalculate percentages for all rows
+        for row in rows[1:]:
+            if not row or len(row) == 0:
+                continue
+            # Total date columns is header length minus 2 (excluding Name and Pct columns)
+            total_days = len(header) - 2
+            p_count = row[1:-1].count("P")
+            pct = (p_count / total_days) * 100 if total_days > 0 else 0.0
+            row[-1] = f"{pct:.1f}%"
+            
+    # Write the entire grid back to the CSV file
+    with open(filepath, mode='w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerows(rows)
+        
+    print(f"[INFO] Exported matrix attendance to {filepath}")
+
 
 def draw_face_annotations(image, faces, match_names, confidences=None):
     """Draws custom bounding boxes and name labels on the image for manual verification.

@@ -176,15 +176,23 @@ def cmd_attendance(args):
         print("  None")
     print("-------------------------\n")
     
-    # Log to CSV
-    if present_list:
-        save_attendance(present_list, args.attendance_file)
+    # Log to CSV (always runs to log absences)
+    save_attendance(present_list, args.attendance_file, args.encodings_file)
         
     # Save visual verification image
     if total_headcount > 0 and args.output_image:
+        output_path = args.output_image
+        # If it is the default path, make it timestamped in the verification directory
+        if output_path == "Attendance-System/annotated_attendance.jpeg":
+            from datetime import datetime
+            date_str = datetime.now().strftime("%d-%m-%Y")
+            output_path = f"Attendance-System/verification/annotated_attendance_{date_str}.jpeg"
+            
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         annotated_img = draw_face_annotations(image, faces, match_names, confidences)
-        cv2.imwrite(args.output_image, annotated_img)
-        print(f"[INFO] Saved annotated verification image to: {args.output_image}")
+        cv2.imwrite(output_path, annotated_img)
+        print(f"[INFO] Saved annotated verification image to: {output_path}")
+
 
 def main():
     parser = argparse.ArgumentParser(

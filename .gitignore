@@ -16,6 +16,8 @@ Attendance-System/models/
 Attendance-System/encodings.pkl
 Attendance-System/attendance.csv
 Attendance-System/annotated_attendance.jpeg
+Attendance-System/verification/
+
 
 # IDEs/Editors
 .vscode/
@@ -26,3 +28,8 @@ Attendance-System/annotated_attendance.jpeg
 # OS
 Thumbs.db
 .DS_Store
+
+# Agent Artifacts
+study_guide.md
+
+
