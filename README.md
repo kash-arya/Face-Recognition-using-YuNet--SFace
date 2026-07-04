@@ -78,15 +78,16 @@ The system will automatically download the required model weights (`face_detecti
 ```
 ├── README.md                           # Project documentation
 └── Attendance-System
+    ├── data/                            # Runtime artifacts
+    │   ├── encodings.pkl               # Pickled student encodings database
+    │   └── attendance.csv              # Cumulative attendance spreadsheet
     ├── main.py                         # CLI controller
-    ├── encodings.pkl                   # Pickled student encodings database
-    ├── attendance.csv                  # Cumulative attendance spreadsheet
     ├── dataset/                        # Reference photos directory
     │   ├── Monica/                     # Monica reference photos
     │   ├── Chandler/                   # Chandler reference photos
     │   └── Ross/                       # Ross reference photos
     ├── models/                         # ONNX model weights (downloaded automatically)
-    ├── verification/                   # Visual verification proofs (timestamped)
+    ├── output/                         # Visual verification proofs (timestamped)
     │   └── annotated_attendance_DD-MM-YYYY.jpeg
     └── src/
         ├── face_engine.py              # YuNet & SFace core wrappers
@@ -126,8 +127,8 @@ uv run python Attendance-System/main.py attendance /mnt/c/Users/ASUS/Downloads/F
 This command automatically:
 1. **Detects** all faces present (prints total headcount to console).
 2. **Matches** faces against `encodings.pkl` database (using L2/Euclidean distance threshold of `1.128`).
-3. **Logs** results to `Attendance-System/attendance.csv` (inserts a new column for today's date formatted as `DD-MM-YYYY`, marks `P`/`A` for all registered students, and updates cumulative attendance percentage).
-4. **Saves** annotated visual proof to `Attendance-System/verification/annotated_attendance_DD-MM-YYYY.jpeg` showing green bounding boxes for recognized students and red boxes for unknowns.
+3. **Logs** results to `Attendance-System/data/attendance.csv` (inserts a new column for today's date formatted as `DD-MM-YYYY`, marks `P`/`A` for all registered students, and updates cumulative attendance percentage).
+4. **Saves** annotated visual proof to `Attendance-System/output/annotated_attendance_DD-MM-YYYY.jpeg` showing green bounding boxes for recognized students and red boxes for unknowns.
 
 ---
 

@@ -43,14 +43,14 @@ def load_models(models_dir="Attendance-System/models"):
     
     return yunet_path, sface_path
 
-def save_encodings(encodings, filepath="Attendance-System/encodings.pkl"):
+def save_encodings(encodings, filepath="Attendance-System/data/encodings.pkl"):
     """Saves the database of student face encodings to a pickle file."""
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, 'wb') as f:
         pickle.dump(encodings, f)
     print(f"[INFO] Saved {len(encodings)} student encodings to {filepath}")
 
-def load_encodings(filepath="Attendance-System/encodings.pkl"):
+def load_encodings(filepath="Attendance-System/data/encodings.pkl"):
     """Loads the database of student face encodings from a pickle file."""
     if not os.path.exists(filepath):
         print(f"[WARNING] Encodings file {filepath} not found. Please register students first.")
@@ -58,7 +58,7 @@ def load_encodings(filepath="Attendance-System/encodings.pkl"):
     with open(filepath, 'rb') as f:
         return pickle.load(f)
 
-def save_attendance(present_students, filepath="Attendance-System/attendance.csv", database_filepath="Attendance-System/encodings.pkl"):
+def save_attendance(present_students, filepath="Attendance-System/data/attendance.csv", database_filepath="Attendance-System/data/encodings.pkl"):
     """Exports attendance to a cumulative CSV matrix format with P/A markers and percentages."""
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     

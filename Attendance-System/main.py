@@ -183,10 +183,10 @@ def cmd_attendance(args):
     if total_headcount > 0 and args.output_image:
         output_path = args.output_image
         # If it is the default path, make it timestamped in the verification directory
-        if output_path == "Attendance-System/annotated_attendance.jpeg":
+        if output_path == "Attendance-System/output/annotated_attendance.jpeg":
             from datetime import datetime
             date_str = datetime.now().strftime("%d-%m-%Y")
-            output_path = f"Attendance-System/verification/annotated_attendance_{date_str}.jpeg"
+            output_path = f"Attendance-System/output/annotated_attendance_{date_str}.jpeg"
             
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         annotated_img = draw_face_annotations(image, faces, match_names, confidences)
@@ -206,22 +206,22 @@ def main():
     reg_parser = subparsers.add_parser("register", help="Scan student dataset and save face embeddings")
     reg_parser.add_argument("--dataset-dir", default="Attendance-System/dataset", help="Path to student face photos directory")
     reg_parser.add_argument("--models-dir", default="Attendance-System/models", help="Directory to save/load model ONNX weights")
-    reg_parser.add_argument("--encodings-file", default="Attendance-System/encodings.pkl", help="Output path for serialized embeddings database")
+    reg_parser.add_argument("--encodings-file", default="Attendance-System/data/encodings.pkl", help="Output path for serialized embeddings database")
     
     # Recognize Single subcommand
     rec_parser = subparsers.add_parser("recognize-single", help="Recognize a single face image")
     rec_parser.add_argument("image_path", help="Path to face image to identify")
     rec_parser.add_argument("--models-dir", default="Attendance-System/models", help="Directory to load model weights")
-    rec_parser.add_argument("--encodings-file", default="Attendance-System/encodings.pkl", help="Path to serialized embeddings database")
+    rec_parser.add_argument("--encodings-file", default="Attendance-System/data/encodings.pkl", help="Path to serialized embeddings database")
     rec_parser.add_argument("--threshold", type=float, default=1.128, help="Euclidean distance threshold (lower = stricter match)")
     
     # Attendance subcommand
     att_parser = subparsers.add_parser("attendance", help="Mark classroom attendance from group/selfie photo")
     att_parser.add_argument("image_path", help="Path to classroom group photo")
     att_parser.add_argument("--models-dir", default="Attendance-System/models", help="Directory to load model weights")
-    att_parser.add_argument("--encodings-file", default="Attendance-System/encodings.pkl", help="Path to serialized embeddings database")
-    att_parser.add_argument("--attendance-file", default="Attendance-System/attendance.csv", help="Output path for attendance spreadsheet")
-    att_parser.add_argument("--output-image", default="Attendance-System/annotated_attendance.jpeg", help="Output path for marked verification photo")
+    att_parser.add_argument("--encodings-file", default="Attendance-System/data/encodings.pkl", help="Path to serialized embeddings database")
+    att_parser.add_argument("--attendance-file", default="Attendance-System/data/attendance.csv", help="Output path for attendance spreadsheet")
+    att_parser.add_argument("--output-image", default="Attendance-System/output/annotated_attendance.jpeg", help="Output path for marked verification photo")
     att_parser.add_argument("--threshold", type=float, default=1.128, help="Euclidean distance threshold (lower = stricter match)")
     
     args = parser.parse_args()

@@ -13,10 +13,8 @@ ENV/
 
 # Project Specific (Generated/Downloaded)
 Attendance-System/models/
-Attendance-System/encodings.pkl
-Attendance-System/attendance.csv
-Attendance-System/annotated_attendance.jpeg
-Attendance-System/verification/
+Attendance-System/data/
+Attendance-System/output/
 
 
 # IDEs/Editors
@@ -30,6 +28,8 @@ Thumbs.db
 .DS_Store
 
 # Agent Artifacts
-study_guide.md
+.agents/
+.commandcode/
+docs/study_guide.md
 
 
