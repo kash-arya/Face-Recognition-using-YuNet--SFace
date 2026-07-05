@@ -1,8 +1,8 @@
 import os
 import urllib.request
-import pickle
 import csv
 from datetime import datetime
+import numpy as np
 import cv2
 
 YUNET_URL = "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx"
@@ -43,22 +43,45 @@ def load_models(models_dir="Attendance-System/models"):
     
     return yunet_path, sface_path
 
-def save_encodings(encodings, filepath="Attendance-System/data/encodings.pkl"):
-    """Saves the database of student face encodings to a pickle file."""
+def save_encodings(encodings, filepath="Attendance-System/data/encodings.txt"):
+    """Saves the database of student face encodings to a plain text file.
+
+    Format:
+        #StudentName
+        v1 v2 v3 ... v128
+        v1 v2 v3 ... v128
+    """
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    with open(filepath, 'wb') as f:
-        pickle.dump(encodings, f)
+    with open(filepath, 'w') as f:
+        for student_name, embeddings in encodings.items():
+            f.write(f"#{student_name}\n")
+            for embedding in embeddings:
+                line = " ".join(str(v) for v in embedding.flatten())
+                f.write(line + "\n")
     print(f"[INFO] Saved {len(encodings)} student encodings to {filepath}")
 
-def load_encodings(filepath="Attendance-System/data/encodings.pkl"):
-    """Loads the database of student face encodings from a pickle file."""
+def load_encodings(filepath="Attendance-System/data/encodings.txt"):
+    """Loads the database of student face encodings from a plain text file."""
     if not os.path.exists(filepath):
         print(f"[WARNING] Encodings file {filepath} not found. Please register students first.")
         return {}
-    with open(filepath, 'rb') as f:
-        return pickle.load(f)
+    encodings = {}
+    current_name = None
+    with open(filepath, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith('#'):
+                current_name = line[1:]
+                encodings[current_name] = []
+            elif current_name is not None:
+                values = np.array([float(x) for x in line.split()], dtype=np.float32)
+                if len(values) == 128:
+                    encodings[current_name].append(values.reshape(1, 128))
+    return encodings
 
-def save_attendance(present_students, filepath="Attendance-System/data/attendance.csv", database_filepath="Attendance-System/data/encodings.pkl"):
+def save_attendance(present_students, filepath="Attendance-System/data/attendance.csv", database_filepath="Attendance-System/data/encodings.txt"):
     """Exports attendance to a cumulative CSV matrix format with P/A markers and percentages."""
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     

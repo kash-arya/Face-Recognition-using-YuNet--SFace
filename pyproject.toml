@@ -1,0 +1,15 @@
+[project]
+name = "face-recognition-attendance"
+version = "1.0.0"
+description = "AI-Based Face Recognition Attendance System using YuNet + SFace"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy==2.5.0",
+    "opencv-contrib-python==4.13.0.92",
+    "pillow==12.2.0",
+    "scikit-learn==1.9.0",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

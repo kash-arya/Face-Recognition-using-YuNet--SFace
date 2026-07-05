@@ -17,7 +17,7 @@ The system uses:
                                 |
                                 v (python main.py register)
                       +-------------------+
-                      | Face Embeddings   | (encodings.pkl)
+                      | Face Embeddings   | (encodings.txt)
                       +---------+---------+
                                 |
                                 | (Comparison via L2 Norm Distance)
@@ -47,7 +47,7 @@ This project uses [uv](https://github.com/astral-sh/uv) as the Python version an
 
 ### 2. Set Up Virtual Environment
 
-Set up the project virtual environment with Python 3.14 (or any version 3.8+):
+Set up the project virtual environment with Python 3.14 (or any version 3.12+):
 
 - **Linux & macOS**:
   ```bash
@@ -66,7 +66,7 @@ Install the required deep learning and image processing dependencies:
 
 - **Linux, macOS, and Windows**:
   ```bash
-  uv pip install opencv-contrib-python numpy pillow scikit-learn
+  uv sync
   ```
 
 The system will automatically download the required model weights (`face_detection_yunet_2023mar.onnx` and `face_recognition_sface_2021dec.onnx`) during the first run.
@@ -76,22 +76,26 @@ The system will automatically download the required model weights (`face_detecti
 ### Project Structure
 
 ```
-├── README.md                           # Project documentation
+├── pyproject.toml                     # Project config with pinned dependencies
+├── uv.lock                            # Locked dependency versions
+├── README.md                          # Project documentation
 └── Attendance-System
-    ├── data/                            # Runtime artifacts
-    │   ├── encodings.pkl               # Pickled student encodings database
-    │   └── attendance.csv              # Cumulative attendance spreadsheet
-    ├── main.py                         # CLI controller
-    ├── dataset/                        # Reference photos directory
-    │   ├── Monica/                     # Monica reference photos
-    │   ├── Chandler/                   # Chandler reference photos
-    │   └── Ross/                       # Ross reference photos
-    ├── models/                         # ONNX model weights (downloaded automatically)
-    ├── output/                         # Visual verification proofs (timestamped)
+    ├── main.py                        # CLI controller (register, recognize-single, attendance)
+    ├── evaluate.py                    # Threshold accuracy evaluation script
+    ├── dataset/                       # Reference face photos by student name
+    │   ├── Monica/
+    │   ├── Chandler/
+    │   └── Ross/
+    ├── models/                        # ONNX model weights (downloaded automatically)
+    ├── data/                          # Runtime artifacts
+    │   ├── encodings.txt              # Plain text student face encodings
+    │   └── attendance.csv             # Cumulative attendance spreadsheet
+    ├── output/                        # Visual verification proofs (timestamped)
     │   └── annotated_attendance_DD-MM-YYYY.jpeg
     └── src/
-        ├── face_engine.py              # YuNet & SFace core wrappers
-        └── utils.py                    # Downloads, serialization, and drawing helpers
+        ├── __init__.py                # Package marker
+        ├── face_engine.py             # YuNet & SFace core wrappers
+        └── utils.py                   # Downloads, serialization, CSV logging, and drawing
 ```
 
 ---
@@ -105,7 +109,7 @@ Extract face coordinates for each student located in the `dataset/` subfolders:
 ```bash
 uv run python Attendance-System/main.py register
 ```
-*Creates `encodings.pkl` containing the serialized face representations.*
+*Creates `encodings.txt` containing the serialized face representations.*
 
 ### Step 2: Test Face Recognition (Single Image)
 Test the engine against a single image to verify identity matching:
@@ -126,14 +130,21 @@ uv run python Attendance-System/main.py attendance /mnt/c/Users/ASUS/Downloads/F
 
 This command automatically:
 1. **Detects** all faces present (prints total headcount to console).
-2. **Matches** faces against `encodings.pkl` database (using L2/Euclidean distance threshold of `1.128`).
+2. **Matches** faces against `encodings.txt` database (using L2/Euclidean distance threshold of `1.17`).
 3. **Logs** results to `Attendance-System/data/attendance.csv` (inserts a new column for today's date formatted as `DD-MM-YYYY`, marks `P`/`A` for all registered students, and updates cumulative attendance percentage).
 4. **Saves** annotated visual proof to `Attendance-System/output/annotated_attendance_DD-MM-YYYY.jpeg` showing green bounding boxes for recognized students and red boxes for unknowns.
+
+### Step 4: Evaluate Recognition Accuracy
+Check the face matching threshold is correctly tuned for your dataset:
+```bash
+uv run python Attendance-System/evaluate.py
+```
+*Outputs: same-person vs different-person distance statistics and the optimal threshold value. Run this after adding new students to the dataset.*
 
 ---
 
 ## Key Design Decisions & Portability
 
-* **Embedded Vector Pickling**: Instead of performing linear deep learning scans on reference images at runtime, embeddings are calculated once and stored in `encodings.pkl`. This speeds up matching into simple vector math executing in milliseconds.
+* **Embedded Vector Serialization**: Instead of performing linear deep learning scans on reference images at runtime, embeddings are calculated once and stored in `encodings.txt` as plain text. This speeds up matching into simple vector math executing in milliseconds and keeps the data portable across platforms.
 * **Cumulative Grid Export**: Attendance logs are organized as a spreadsheet matrix rather than a transaction log, keeping track of every registered student and their total attendance percentage over the term.
 * **OpenCV DNN Portability**: The system uses native ONNX weights supported directly by OpenCV DNN. This enables seamless porting to other platforms, such as integrating the backend into a Flask/FastAPI REST API or loading models directly on-device using the OpenCV Android SDK or ONNX Runtime Mobile, using the exact same YuNet/SFace pipeline logic.

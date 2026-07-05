@@ -15,6 +15,7 @@ ENV/
 Attendance-System/models/
 Attendance-System/data/
 Attendance-System/output/
+face_recognition_attendance.egg-info/
 
 
 # IDEs/Editors
