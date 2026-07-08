@@ -109,7 +109,7 @@ Extract face coordinates for each student located in the `dataset/` subfolders:
 ```bash
 uv run python Attendance-System/main.py register
 ```
-*Creates `encodings.txt` containing the serialized face representations.*
+*Creates `encodings.txt` containing the serialized face representations. Registration automatically generates Gaussian-blurred variants of each photo so that close-up selfie registrations still match distant lecture hall faces during attendance.*
 
 ### Step 2: Test Face Recognition (Single Image)
 Test the engine against a single image to verify identity matching:
@@ -130,9 +130,10 @@ uv run python Attendance-System/main.py attendance /mnt/c/Users/ASUS/Downloads/F
 
 This command automatically:
 1. **Detects** all faces present (prints total headcount to console).
-2. **Matches** faces against `encodings.txt` database (using L2/Euclidean distance threshold of `1.17`).
+2. **Matches** faces against `encodings.txt` database (using L2/Euclidean distance threshold of `1.19`).
 3. **Logs** results to `Attendance-System/data/attendance.csv` (inserts a new column for today's date formatted as `DD-MM-YYYY`, marks `P`/`A` for all registered students, and updates cumulative attendance percentage).
 4. **Saves** annotated visual proof to `Attendance-System/output/annotated_attendance_DD-MM-YYYY.jpeg` showing green bounding boxes for recognized students and red boxes for unknowns.
+5. **Optionally outputs JSON** for app integration: add `--output-json Attendance-System/output/attendance.json` to get structured results (date, headcount, present students, per-face distances).
 
 ### Step 4: Evaluate Recognition Accuracy
 Check the face matching threshold is correctly tuned for your dataset:

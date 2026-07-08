@@ -9,7 +9,7 @@ import cv2
 from src.face_engine import FaceRecognitionEngine
 from src.utils import load_models, load_encodings
 
-DEFAULT_THRESHOLD = 1.17
+DEFAULT_THRESHOLD = 1.19
 
 
 def evaluate_distance_distribution(args):
