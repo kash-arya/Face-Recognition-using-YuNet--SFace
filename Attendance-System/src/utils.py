@@ -204,7 +204,7 @@ def draw_face_annotations(image, faces, match_names, confidences=None):
         
         # Sleek dark/vibrant colors
         # Green for known, Red for unknown
-        color = (46, 204, 113) if is_known else (231, 76, 60) 
+        color = (46, 204, 113) if is_known else (60, 76, 231)  # BGR: green for known, red for unknown
         thickness = 2
         
         # Draw bounding box

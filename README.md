@@ -79,6 +79,8 @@ The system will automatically download the required model weights (`face_detecti
 ├── pyproject.toml                     # Project config with pinned dependencies
 ├── uv.lock                            # Locked dependency versions
 ├── README.md                          # Project documentation
+├── docs/
+│   └── study_guide.md                 # In-depth technical guide for understanding the system
 └── Attendance-System
     ├── main.py                        # CLI controller (register, recognize-single, attendance)
     ├── evaluate.py                    # Threshold accuracy evaluation script
@@ -105,11 +107,11 @@ The system will automatically download the required model weights (`face_detecti
 Run all commands from the workspace root directory using `uv run`.
 
 ### Step 1: Student Registration (Enrollment)
-Extract face coordinates for each student located in the `dataset/` subfolders:
+Extract face embeddings for each student located in the `dataset/` subfolders:
 ```bash
 uv run python Attendance-System/main.py register
 ```
-*Creates `encodings.txt` containing the serialized face representations. Registration automatically generates Gaussian-blurred variants of each photo so that close-up selfie registrations still match distant lecture hall faces during attendance.*
+*Creates `encodings.txt` containing 128-dimensional face embedding vectors for each student. Registration automatically generates Gaussian-blurred variants of each photo so that close-up selfie registrations still match distant lecture hall faces during attendance. Re-running registration refreshes embeddings for present students while preserving encodings for any student not currently in the dataset folder.*
 
 ### Step 2: Test Face Recognition (Single Image)
 Test the engine against a single image to verify identity matching:

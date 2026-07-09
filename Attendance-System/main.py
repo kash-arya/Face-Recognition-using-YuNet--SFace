@@ -36,7 +36,14 @@ def cmd_register(args):
         print(f"[ERROR] Dataset directory not found: {args.dataset_dir}")
         return
 
-    encodings_db = {}
+    # Load existing encodings so re-runs preserve students not in the current dataset scan.
+    # Students whose folders are present will be re-processed (embeddings refreshed).
+    # Students whose folders are absent will retain their existing embeddings.
+    if os.path.exists(args.encodings_file):
+        encodings_db = load_encodings(args.encodings_file)
+        print(f"[INFO] Loaded {len(encodings_db)} existing student(s) from {args.encodings_file}")
+    else:
+        encodings_db = {}
 
     for item in os.listdir(args.dataset_dir):
         student_path = os.path.join(args.dataset_dir, item)
