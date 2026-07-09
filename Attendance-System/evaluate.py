@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -10,6 +11,7 @@ from src.face_engine import FaceRecognitionEngine
 from src.utils import load_models, load_encodings
 
 DEFAULT_THRESHOLD = 1.19
+_SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 def evaluate_distance_distribution(args):
@@ -102,9 +104,9 @@ def evaluate_distance_distribution(args):
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate face matching threshold accuracy")
-    parser.add_argument("--dataset-dir", default="Attendance-System/dataset")
-    parser.add_argument("--models-dir", default="Attendance-System/models")
-    parser.add_argument("--encodings-file", default="Attendance-System/data/encodings.txt")
+    parser.add_argument("--dataset-dir", default=str(_SCRIPT_DIR / "dataset"))
+    parser.add_argument("--models-dir", default=str(_SCRIPT_DIR / "models"))
+    parser.add_argument("--encodings-file", default=str(_SCRIPT_DIR / "data" / "encodings.txt"))
     args = parser.parse_args()
     evaluate_distance_distribution(args)
 

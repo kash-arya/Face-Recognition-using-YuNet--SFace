@@ -82,18 +82,23 @@ The system will automatically download the required model weights (`face_detecti
 ├── docs/
 │   └── study_guide.md                 # In-depth technical guide for understanding the system
 └── Attendance-System
-    ├── main.py                        # CLI controller (register, recognize-single, attendance)
+    ├── main.py                        # CLI controller (register, recognize-single, attendance, list)
     ├── evaluate.py                    # Threshold accuracy evaluation script
     ├── dataset/                       # Reference face photos by student name
     │   ├── Monica/
     │   ├── Chandler/
     │   └── Ross/
-    ├── models/                        # ONNX model weights (downloaded automatically)
+    ├── models/                        # ONNX model weights (downloaded automatically with SHA256 verification)
     ├── data/                          # Runtime artifacts
     │   ├── encodings.txt              # Plain text student face encodings
     │   └── attendance.csv             # Cumulative attendance spreadsheet
     ├── output/                        # Visual verification proofs (timestamped)
     │   └── annotated_attendance_DD-MM-YYYY.jpeg
+    ├── tests/                         # Unit tests (encodings, attendance CSV, face engine)
+    │   ├── conftest.py
+    │   ├── test_encodings.py
+    │   ├── test_attendance.py
+    │   └── test_face_engine.py
     └── src/
         ├── __init__.py                # Package marker
         ├── face_engine.py             # YuNet & SFace core wrappers
@@ -111,14 +116,14 @@ Extract face embeddings for each student located in the `dataset/` subfolders:
 ```bash
 uv run python Attendance-System/main.py register
 ```
-*Creates `encodings.txt` containing 128-dimensional face embedding vectors for each student. Registration automatically generates Gaussian-blurred variants of each photo so that close-up selfie registrations still match distant lecture hall faces during attendance. Re-running registration refreshes embeddings for present students while preserving encodings for any student not currently in the dataset folder.*
+*Creates `encodings.txt` containing 128-dimensional face embedding vectors for each student. Registration automatically generates Gaussian-blurred variants of each photo so that close-up selfie registrations still match distant lecture hall faces during attendance. Re-running registration refreshes embeddings for present students while preserving encodings for any student not currently in the dataset folder. Use `--no-augmentation` to skip blur augmentation for faster iterative testing.*
 
 ### Step 2: Test Face Recognition (Single Image)
 Test the engine against a single image to verify identity matching:
 ```bash
 uv run python Attendance-System/main.py recognize-single Attendance-System/dataset/Monica/Monica1.jpeg
 ```
-*Outputs: Identified name, Euclidean distance score, and face detection confidence.*
+*Outputs: Identified name, Euclidean distance score, and face detection confidence. Use `--output-json` for structured results and `--output-image` for an annotated verification image.*
 
 ### Step 3: Run Classroom Attendance
 Process a classroom group photo to headcount students and log attendance:
@@ -143,6 +148,13 @@ Check the face matching threshold is correctly tuned for your dataset:
 uv run python Attendance-System/evaluate.py
 ```
 *Outputs: same-person vs different-person distance statistics and the optimal threshold value. Run this after adding new students to the dataset.*
+
+### Step 5: List Registered Students
+View all currently enrolled students and their embedding counts:
+```bash
+uv run python Attendance-System/main.py list
+```
+*Outputs: Each registered student name and the number of stored face embeddings.*
 
 ---
 
