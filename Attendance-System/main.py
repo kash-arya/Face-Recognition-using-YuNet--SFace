@@ -28,6 +28,22 @@ def _read_image(path):
     return image
 
 
+def _filter_faces(faces, min_confidence):
+    """Keeps only faces with confidence >= min_confidence. Returns filtered list."""
+    filtered = [f for f in faces if f[14] >= min_confidence]
+    if len(faces) > 0 and len(filtered) == 0:
+        print(f"[WARNING] All {len(faces)} detected faces have confidence below {min_confidence}. None will be recognized.")
+    elif len(faces) != len(filtered):
+        print(f"[INFO] Filtered out {len(faces) - len(filtered)} low-confidence face(s) (threshold: {min_confidence}).")
+    return filtered
+
+
+def _timestamped_path(filepath):
+    """Inserts a date stamp before the file extension: 'out.jpg' -> 'out_01-01-2026.jpg'"""
+    base, ext = os.path.splitext(filepath)
+    return f"{base}_{datetime.now():%d-%m-%Y}{ext}"
+
+
 def cmd_register(args):
     yunet_path, sface_path = load_models(args.models_dir)
     engine = FaceRecognitionEngine(yunet_path, sface_path)
@@ -36,9 +52,6 @@ def cmd_register(args):
         print(f"[ERROR] Dataset directory not found: {args.dataset_dir}")
         return
 
-    # Load existing encodings so re-runs preserve students not in the current dataset scan.
-    # Students whose folders are present will be re-processed (embeddings refreshed).
-    # Students whose folders are absent will retain their existing embeddings.
     if os.path.exists(args.encodings_file):
         encodings_db = load_encodings(args.encodings_file)
         print(f"[INFO] Loaded {len(encodings_db)} existing student(s) from {args.encodings_file}")
@@ -89,7 +102,9 @@ def cmd_register(args):
                     af = max(aug_faces, key=lambda f: f[14]) if len(aug_faces) > 1 else aug_faces[0]
                     if af[14] >= args.min_confidence:
                         embeddings.append(engine.extract_embedding(blurred, af))
-            print(f"    Added {len(embeddings) - before} embeddings (original + augmented)")
+            num_augmented = len(embeddings) - before
+            if num_augmented > 0:
+                print(f"    Added {num_augmented} embeddings (original + {num_augmented - 1} augmented)")
 
         if embeddings:
             encodings_db[item] = embeddings
@@ -118,16 +133,43 @@ def cmd_recognize_single(args):
         print("[RESULT] No face detected in the image.")
         return
 
+    faces = _filter_faces(faces, args.min_confidence)
+    if len(faces) == 0:
+        print("[RESULT] No faces passed the confidence threshold.")
+        return
+
     if len(faces) > 1:
-        print(f"[WARNING] {len(faces)} faces detected but this is single-face mode. Recognizing the highest-confidence face only.")
-        print(f"         Use the 'attendance' command for group photos.")
+        print(f"[INFO] {len(faces)} faces detected but this is single-face mode. Using the highest-confidence face only.")
+        print(f"       Use the 'attendance' command for group photos.")
 
-    print(f"[INFO] Detected {len(faces)} face(s) in {args.image_path}.")
+    # Pick the single best face by detection confidence
+    best_face = max(faces, key=lambda f: f[14])
+    embedding = engine.extract_embedding(image, best_face)
+    name, distance = engine.match_face(embedding, database)
 
-    for idx, face in enumerate(faces):
-        embedding = engine.extract_embedding(image, face)
-        name, distance = engine.match_face(embedding, database)
-        print(f"Face #{idx+1}: {name}  (Distance: {distance:.3f}, Confidence: {face[14]:.3f})")
+    print(f"[RESULT] {name}  (Distance: {distance:.3f}, Detection Confidence: {best_face[14]:.3f})")
+
+    if args.output_json:
+        result = {
+            "image": args.image_path,
+            "result": {
+                "name": name,
+                "distance": round(float(distance), 3),
+                "detection_confidence": round(float(best_face[14]), 3),
+            }
+        }
+        json_path = os.path.abspath(args.output_json)
+        os.makedirs(os.path.dirname(json_path), exist_ok=True)
+        with open(json_path, 'w') as f:
+            json.dump(result, f, indent=2)
+        print(f"[INFO] Saved JSON result to: {json_path}")
+
+    if args.output_image:
+        output_path = _timestamped_path(args.output_image)
+        os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else ".", exist_ok=True)
+        annotated = draw_face_annotations(image, np.array([best_face]), [name], [distance])
+        cv2.imwrite(output_path, annotated)
+        print(f"[INFO] Saved annotated verification image to: {output_path}")
 
 
 def cmd_attendance(args):
@@ -141,7 +183,11 @@ def cmd_attendance(args):
         return
 
     success, faces = engine.detect_faces(image)
-    total_headcount = len(faces) if (success and faces is not None) else 0
+    if not success or faces is None:
+        faces = np.array([])
+
+    faces = _filter_faces(faces, args.min_confidence)
+    total_headcount = len(faces)
 
     present = set()
     match_names = []
@@ -164,6 +210,8 @@ def cmd_attendance(args):
             print(f" - {name}")
     else:
         print("  None")
+        if total_headcount > 0:
+            print("[TIP] No faces matched. You may want to tune the threshold with evaluate.py")
     print("-------------------------\n")
 
     save_attendance(present, args.attendance_file, args.encodings_file)
@@ -177,19 +225,31 @@ def cmd_attendance(args):
                 {"name": n, "distance": round(float(d), 3)} for n, d in zip(match_names, distances)
             ]
         }
-        json_path = args.output_json
-        os.makedirs(os.path.dirname(json_path) if os.path.dirname(json_path) else "Attendance-System/output", exist_ok=True)
+        json_path = os.path.abspath(args.output_json)
+        os.makedirs(os.path.dirname(json_path), exist_ok=True)
         with open(json_path, 'w') as f:
             json.dump(result, f, indent=2)
         print(f"[INFO] Saved JSON attendance data to: {json_path}")
 
     if total_headcount > 0 and args.output_image:
-        output_path = args.output_image.replace("annotated_attendance.jpeg",
-                                                f"annotated_attendance_{datetime.now():%d-%m-%Y}.jpeg")
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        output_path = _timestamped_path(args.output_image)
+        os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else ".", exist_ok=True)
         annotated = draw_face_annotations(image, faces, match_names, distances)
         cv2.imwrite(output_path, annotated)
         print(f"[INFO] Saved annotated verification image to: {output_path}")
+
+
+def cmd_list_students(args):
+    database = load_encodings(args.encodings_file)
+    if not database:
+        print("[INFO] No students currently registered.")
+        return
+
+    print(f"\n{len(database)} registered student(s):\n")
+    for name in sorted(database.keys()):
+        count = len(database[name])
+        print(f"  {name}  ({count} embedding{'s' if count != 1 else ''})")
+    print()
 
 
 def main():
@@ -207,15 +267,22 @@ def main():
     rec.add_argument("--models-dir", default="Attendance-System/models")
     rec.add_argument("--encodings-file", default="Attendance-System/data/encodings.txt")
     rec.add_argument("--threshold", type=float, default=1.19)
+    rec.add_argument("--min-confidence", type=float, default=0.85, help="Minimum face detection confidence to accept")
+    rec.add_argument("--output-json", default=None, help="Output path for JSON recognition result")
+    rec.add_argument("--output-image", default=None, help="Output path for annotated verification image")
 
     att = subparsers.add_parser("attendance", help="Mark classroom attendance from a group photo")
     att.add_argument("image_path")
     att.add_argument("--models-dir", default="Attendance-System/models")
     att.add_argument("--encodings-file", default="Attendance-System/data/encodings.txt")
     att.add_argument("--attendance-file", default="Attendance-System/data/attendance.csv")
-    att.add_argument("--output-image", default="Attendance-System/output/annotated_attendance.jpeg")
+    att.add_argument("--output-image", default=None, help="Output path for annotated verification image")
     att.add_argument("--output-json", default=None, help="Output path for JSON attendance results")
     att.add_argument("--threshold", type=float, default=1.19)
+    att.add_argument("--min-confidence", type=float, default=0.85, help="Minimum face detection confidence to accept")
+
+    lst = subparsers.add_parser("list", help="List all currently registered students")
+    lst.add_argument("--encodings-file", default="Attendance-System/data/encodings.txt")
 
     args = parser.parse_args()
 
@@ -225,6 +292,8 @@ def main():
         cmd_recognize_single(args)
     elif args.command == "attendance":
         cmd_attendance(args)
+    elif args.command == "list":
+        cmd_list_students(args)
     else:
         parser.print_help()
 
