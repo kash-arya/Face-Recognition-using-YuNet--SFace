@@ -86,10 +86,7 @@ The system will automatically download the required model weights (`face_detecti
     ├── evaluate.py                    # Threshold accuracy evaluation with held-out test support
     ├── split_dataset.py               # Splits photos 60/40 into enrollment/test for honest evaluation
     ├── setup_lfw_dataset.py           # Downloads LFW funneled dataset for expanded testing
-    ├── dataset/                       # Reference face photos by student name (enrollment)
-    │   ├── Monica/
-    │   ├── Chandler/
-    │   └── Ross/
+    ├── dataset/                       # Reference face photos by student name (enrollment) — 15 people from LFW benchmark
     ├── test/                          # Held-out test photos (not used during registration)
     ├── models/                        # ONNX model weights (downloaded automatically with SHA256 verification)
     ├── data/                          # Runtime artifacts
@@ -140,7 +137,7 @@ uv run python Attendance-System/main.py attendance /mnt/c/Users/ASUS/Downloads/F
 
 This command automatically:
 1. **Detects** all faces present (prints total headcount to console).
-2. **Matches** faces against `encodings.txt` database (using L2/Euclidean distance threshold of `1.19`).
+2. **Matches** faces against `encodings.txt` database (using L2/Euclidean distance threshold of `1.10`).
 3. **Logs** results to `Attendance-System/data/attendance.csv` (inserts a new column for today's date formatted as `DD-MM-YYYY`, marks `P`/`A` for all registered students, and updates cumulative attendance percentage).
 4. **Saves** annotated visual proof to `Attendance-System/output/annotated_attendance_DD-MM-YYYY.jpeg` showing green bounding boxes for recognized students and red boxes for unknowns.
 5. **Optionally outputs JSON** for app integration: add `--output-json Attendance-System/output/attendance.json` to get structured results (date, headcount, present students, per-face distances).
@@ -172,4 +169,4 @@ uv run python Attendance-System/main.py list
 
 * **Embedded Vector Serialization**: Instead of performing linear deep learning scans on reference images at runtime, embeddings are calculated once and stored in `encodings.txt` as plain text. This speeds up matching into simple vector math executing in milliseconds and keeps the data portable across platforms.
 * **Cumulative Grid Export**: Attendance logs are organized as a spreadsheet matrix rather than a transaction log, keeping track of every registered student and their total attendance percentage over the term.
-* **OpenCV DNN Portability**: The system uses native ONNX weights supported directly by OpenCV DNN. This enables seamless porting to other platforms, such as integrating the backend into a Flask/FastAPI REST API or loading models directly on-device using the OpenCV Android SDK or ONNX Runtime Mobile, using the exact same YuNet/SFace pipeline logic.
+* **OpenCV DNN Portability**: The system uses native ONNX weights supported directly by OpenCV DNN with multi-threaded inference (`cv2.setNumThreads(4)`). This enables seamless porting to other platforms, such as integrating the backend into a Flask/FastAPI REST API or loading models directly on-device using the OpenCV Android SDK or ONNX Runtime Mobile, using the exact same YuNet/SFace pipeline logic.

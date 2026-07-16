@@ -15,7 +15,7 @@ class TestFaceEngine:
             return engine
 
     def test_match_face_exact_match(self, engine):
-        engine.distance_threshold = 1.19
+        engine.distance_threshold = 1.10
         engine.compute_distance = MagicMock(return_value=0.5)
 
         database = {
@@ -30,7 +30,7 @@ class TestFaceEngine:
         assert distance == 0.5
 
     def test_match_face_below_threshold_returns_unknown(self, engine):
-        engine.distance_threshold = 1.19
+        engine.distance_threshold = 1.10
         engine.compute_distance = MagicMock(return_value=2.5)
 
         database = {
@@ -51,7 +51,7 @@ class TestFaceEngine:
         assert distance == float('inf')
 
     def test_match_face_multiple_embeddings_per_student(self, engine):
-        engine.distance_threshold = 1.19
+        engine.distance_threshold = 1.10
 
         call_count = [0]
         def distance_side_effect(e1, e2):

@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 class FaceRecognitionEngine:
-    def __init__(self, yunet_path, sface_path, score_threshold=0.9, nms_threshold=0.3, distance_threshold=1.19):
+    def __init__(self, yunet_path, sface_path, score_threshold=0.9, nms_threshold=0.3, distance_threshold=1.10):
         self.yunet_path = yunet_path
         self.sface_path = sface_path
         self.score_threshold = score_threshold

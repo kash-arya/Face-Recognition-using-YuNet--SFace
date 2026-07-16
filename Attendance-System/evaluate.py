@@ -10,7 +10,7 @@ import cv2
 from src.face_engine import FaceRecognitionEngine
 from src.utils import load_models, load_encodings
 
-DEFAULT_THRESHOLD = 1.19
+DEFAULT_THRESHOLD = 1.10
 _SCRIPT_DIR = Path(__file__).resolve().parent
 
 

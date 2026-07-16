@@ -30,10 +30,9 @@ face_recognition_attendance.egg-info/
 Thumbs.db
 .DS_Store
 
-# Agent Artifacts
+# Local Notes
 .agents/
 .commandcode/
-docs/study_guide.md
-docs/QnA through study_guide.md
+docs/
 
 

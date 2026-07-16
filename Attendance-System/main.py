@@ -278,7 +278,7 @@ def main():
     rec.add_argument("image_path")
     rec.add_argument("--models-dir", default=str(_SCRIPT_DIR / "models"))
     rec.add_argument("--encodings-file", default=str(_SCRIPT_DIR / "data" / "encodings.txt"))
-    rec.add_argument("--threshold", type=float, default=1.19)
+    rec.add_argument("--threshold", type=float, default=1.10)
     rec.add_argument("--min-confidence", type=float, default=0.85, help="Minimum face detection confidence to accept")
     rec.add_argument("--output-json", default=None, help="Output path for JSON recognition result")
     rec.add_argument("--output-image", default=None, help="Output path for annotated verification image")
@@ -290,7 +290,7 @@ def main():
     att.add_argument("--attendance-file", default=str(_SCRIPT_DIR / "data" / "attendance.csv"))
     att.add_argument("--output-image", default=str(_SCRIPT_DIR / "output" / "annotated_attendance.jpeg"), help="Output path for annotated verification image")
     att.add_argument("--output-json", default=None, help="Output path for JSON attendance results")
-    att.add_argument("--threshold", type=float, default=1.19)
+    att.add_argument("--threshold", type=float, default=1.10)
     att.add_argument("--min-confidence", type=float, default=0.85, help="Minimum face detection confidence to accept")
 
     lst = subparsers.add_parser("list", help="List all currently registered students")
