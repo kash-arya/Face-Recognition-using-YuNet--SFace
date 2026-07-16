@@ -94,6 +94,12 @@ def cmd_register(args):
                 print(f"  [WARNING] Face confidence too low ({confidence:.2f} < {args.min_confidence}). Skipping.")
                 continue
 
+            if not args.no_quality_check:
+                ok, reason = engine.check_face_quality(best_face)
+                if not ok:
+                    print(f"  [WARNING] Face quality check failed: {reason}. Skipping.")
+                    continue
+
             before = len(embeddings)
             embedding = engine.extract_embedding(image, best_face)
             embeddings.append(embedding)
@@ -266,6 +272,7 @@ def main():
     reg.add_argument("--encodings-file", default=str(_SCRIPT_DIR / "data" / "encodings.txt"))
     reg.add_argument("--min-confidence", type=float, default=0.85, help="Minimum face detection confidence to accept")
     reg.add_argument("--no-augmentation", action="store_true", help="Skip Gaussian blur augmentation (faster, less robust)")
+    reg.add_argument("--no-quality-check", action="store_true", help="Skip face quality gate (tilt, size) during registration")
 
     rec = subparsers.add_parser("recognize-single", help="Recognize a single face image")
     rec.add_argument("image_path")

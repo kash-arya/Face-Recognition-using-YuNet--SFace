@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache/
 .ipynb_checkpoints/
 
 # Virtual Environments
@@ -14,6 +15,7 @@ ENV/
 # Project Specific (Generated/Downloaded)
 Attendance-System/models/
 Attendance-System/data/
+Attendance-System/test/
 Attendance-System/output/
 face_recognition_attendance.egg-info/
 

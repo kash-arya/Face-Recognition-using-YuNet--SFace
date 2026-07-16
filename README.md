@@ -83,11 +83,14 @@ The system will automatically download the required model weights (`face_detecti
 │   └── study_guide.md                 # In-depth technical guide for understanding the system
 └── Attendance-System
     ├── main.py                        # CLI controller (register, recognize-single, attendance, list)
-    ├── evaluate.py                    # Threshold accuracy evaluation script
-    ├── dataset/                       # Reference face photos by student name
+    ├── evaluate.py                    # Threshold accuracy evaluation with held-out test support
+    ├── split_dataset.py               # Splits photos 60/40 into enrollment/test for honest evaluation
+    ├── setup_lfw_dataset.py           # Downloads LFW funneled dataset for expanded testing
+    ├── dataset/                       # Reference face photos by student name (enrollment)
     │   ├── Monica/
     │   ├── Chandler/
     │   └── Ross/
+    ├── test/                          # Held-out test photos (not used during registration)
     ├── models/                        # ONNX model weights (downloaded automatically with SHA256 verification)
     ├── data/                          # Runtime artifacts
     │   ├── encodings.txt              # Plain text student face encodings
@@ -116,7 +119,7 @@ Extract face embeddings for each student located in the `dataset/` subfolders:
 ```bash
 uv run python Attendance-System/main.py register
 ```
-*Creates `encodings.txt` containing 128-dimensional face embedding vectors for each student. Registration automatically generates Gaussian-blurred variants of each photo so that close-up selfie registrations still match distant lecture hall faces during attendance. Re-running registration refreshes embeddings for present students while preserving encodings for any student not currently in the dataset folder. Use `--no-augmentation` to skip blur augmentation for faster iterative testing.*
+*Creates `encodings.txt` containing 128-dimensional face embedding vectors for each student. Registration automatically generates Gaussian-blurred variants of each photo so that close-up selfie registrations still match distant lecture hall faces during attendance. A face quality gate rejects tilted (>30°) or too-small (<60px) enrollment photos — use `--no-quality-check` to bypass. Re-running registration refreshes embeddings for present students while preserving encodings for any student not currently in the dataset folder. Use `--no-augmentation` to skip blur augmentation for faster iterative testing.*
 
 ### Step 2: Test Face Recognition (Single Image)
 Test the engine against a single image to verify identity matching:
@@ -143,11 +146,18 @@ This command automatically:
 5. **Optionally outputs JSON** for app integration: add `--output-json Attendance-System/output/attendance.json` to get structured results (date, headcount, present students, per-face distances).
 
 ### Step 4: Evaluate Recognition Accuracy
-Check the face matching threshold is correctly tuned for your dataset:
+
+**First, split your dataset** into enrollment and held-out test photos:
 ```bash
-uv run python Attendance-System/evaluate.py
+uv run python Attendance-System/split_dataset.py
 ```
-*Outputs: same-person vs different-person distance statistics and the optimal threshold value. Run this after adding new students to the dataset.*
+*Splits each person's photos 60/40 into `dataset/` (for registration) and `test/` (for evaluation). Original full dataset is backed up.*
+
+Then evaluate with held-out test data for honest accuracy measurements:
+```bash
+uv run python Attendance-System/evaluate.py --test-dir Attendance-System/test
+```
+*Outputs: same-person vs different-person distance statistics and the optimal threshold value. Using `--test-dir` prevents data leakage — testing on photos the model has never seen during registration. Without it, evaluate.py warns about artificially optimistic results.*
 
 ### Step 5: List Registered Students
 View all currently enrolled students and their embedding counts:

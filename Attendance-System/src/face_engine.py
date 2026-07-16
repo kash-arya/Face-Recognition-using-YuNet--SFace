@@ -8,7 +8,12 @@ class FaceRecognitionEngine:
         self.score_threshold = score_threshold
         self.nms_threshold = nms_threshold
         self.distance_threshold = distance_threshold
-        
+
+        self.min_face_size = 60
+        self.max_tilt_degrees = 30
+
+        cv2.setNumThreads(4)
+
         # Instantiate detector placeholder. Input size needs to be set dynamically.
         self.detector = None
         self.detector_input_size = (0, 0)
@@ -39,6 +44,30 @@ class FaceRecognitionEngine:
         if retval and faces is not None:
             return True, faces
         return False, np.array([])
+
+    def check_face_quality(self, face):
+        """Validates face quality for enrollment. Returns (ok_bool, reason_string).
+
+        Checks:
+        - Face crop size (too small faces produce unreliable embeddings)
+        - Head tilt (tilted faces confuse alignment)
+        """
+        x, y, w, h = face[0:4].astype(int)
+        re_x, re_y = face[4], face[5]
+        le_x, le_y = face[6], face[7]
+
+        if w < self.min_face_size or h < self.min_face_size:
+            return False, f"Face too small ({w}x{h}px, need >= {self.min_face_size}x{self.min_face_size})"
+
+        dx = le_x - re_x
+        dy = le_y - re_y
+        angle_rad = np.arctan2(abs(dy), abs(dx))
+        angle_deg = np.degrees(angle_rad)
+
+        if angle_deg > self.max_tilt_degrees:
+            return False, f"Head tilt too high ({angle_deg:.1f}°, max {self.max_tilt_degrees}°) — use a front-facing photo"
+
+        return True, ""
 
     def extract_embedding(self, image, face):
         """Aligns and crops the face, then extracts the 128-dimensional embedding vector."""
