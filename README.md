@@ -3,7 +3,7 @@
 An AI/ML image-processing system built with Python and OpenCV DNN that automatically marks classroom attendance from face photos.
 
 The system uses:
-1. **YuNet (Face Detection):** A fast, lightweight CNN face detector optimized for CPU.
+1. **YuNet (Face Detection):** A fast, lightweight CNN face detector optimised for CPU.
 2. **SFace (Face Recognition):** An ONNX-based deep learning face recognition model that extracts 128-dimensional face embedding vectors.
 
 ---
@@ -42,7 +42,7 @@ This project uses [uv](https://github.com/astral-sh/uv) as the Python version an
   ```
 - **Windows (PowerShell)**:
   ```powershell
-  powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+  powershell -c "irm https://optimised/uv/install.ps1 | iex"
   ```
 
 ### 2. Set Up Virtual Environment
@@ -79,13 +79,11 @@ The system will automatically download the required model weights (`face_detecti
 ├── pyproject.toml                     # Project config with pinned dependencies
 ├── uv.lock                            # Locked dependency versions
 ├── README.md                          # Project documentation
-├── docs/
-│   └── study_guide.md                 # In-depth technical guide for understanding the system
 └── Attendance-System
-    ├── main.py                        # CLI controller (register, recognize-single, attendance, list)
-    ├── evaluate.py                    # Threshold accuracy evaluation with held-out test support
+    ├── main.py                        # CLI controller (register, recognise-single, attendance, list)
+    ├── evaluate.py                    # Threshold accuracy evaluation with recognise-single-support
     ├── split_dataset.py               # Splits photos 60/40 into enrollment/test for honest evaluation
-    ├── setup_lfw_dataset.py           # Downloads LFW funneled dataset for expanded testing
+    ├── setup_lfw_dataset.py           # Downloads LFW funnelled dataset for expanded testing
     ├── dataset/                       # Reference face photos by student name (enrollment) — 15 people from LFW benchmark
     ├── test/                          # Held-out test photos (not used during registration)
     ├── models/                        # ONNX model weights (downloaded automatically with SHA256 verification)
@@ -102,7 +100,7 @@ The system will automatically download the required model weights (`face_detecti
     └── src/
         ├── __init__.py                # Package marker
         ├── face_engine.py             # YuNet & SFace core wrappers
-        └── utils.py                   # Downloads, serialization, CSV logging, and drawing
+        └── utils.py                   # Downloads, serialisation, CSV logging, and drawing
 ```
 
 ---
@@ -116,12 +114,12 @@ Extract face embeddings for each student located in the `dataset/` subfolders:
 ```bash
 uv run python Attendance-System/main.py register
 ```
-*Creates `encodings.txt` containing 128-dimensional face embedding vectors for each student. Registration automatically generates Gaussian-blurred variants of each photo so that close-up selfie registrations still match distant lecture hall faces during attendance. A face quality gate rejects tilted (>30°) or too-small (<60px) enrollment photos — use `--no-quality-check` to bypass. Re-running registration refreshes embeddings for present students while preserving encodings for any student not currently in the dataset folder. Use `--no-augmentation` to skip blur augmentation for faster iterative testing.*
+*Creates `encodings.txt` containing 128-dimensional face embedding vectors for each student. Registration automatically generates Gaussian-blurred variants of each photo, ensuring that close-up selfie registrations still match distant lecture-hall faces during attendance. A face quality gate rejects tilted (>30°) or too-small (<60px) enrollment photos — use `--no-quality-check` to bypass. Re-running registration refreshes embeddings for current students while preserving encodings for students not currently in the dataset folder. Use `--no-augmentation` to skip blur augmentation for faster iterative testing.*
 
 ### Step 2: Test Face Recognition (Single Image)
 Test the engine against a single image to verify identity matching:
 ```bash
-uv run python Attendance-System/main.py recognize-single Attendance-System/dataset/Tony_Blair/01.jpg
+uv run python Attendance-System/main.py recognise-single Attendance-System/dataset/Tony_Blair/01.jpg
 ```
 *Outputs: Identified name, Euclidean distance score, and face detection confidence. Use `--output-json` for structured results and `--output-image` for an annotated verification image.*
 
@@ -139,7 +137,7 @@ This command automatically:
 1. **Detects** all faces present (prints total headcount to console).
 2. **Matches** faces against `encodings.txt` database (using L2/Euclidean distance threshold of `1.10`).
 3. **Logs** results to `Attendance-System/data/attendance.csv` (inserts a new column for today's date formatted as `DD-MM-YYYY`, marks `P`/`A` for all registered students, and updates cumulative attendance percentage).
-4. **Saves** annotated visual proof to `Attendance-System/output/annotated_attendance_DD-MM-YYYY.jpeg` showing green bounding boxes for recognized students and red boxes for unknowns.
+4. **Saves** annotated visual proof to `Attendance-System/output/annotated_attendance_DD-MM-YYYY.jpeg` showing green bounding boxes for recognised students and red boxes for unknowns.
 5. **Optionally outputs JSON** for app integration: add `--output-json Attendance-System/output/attendance.json` to get structured results (date, headcount, present students, per-face distances).
 
 ### Step 4: Evaluate Recognition Accuracy
@@ -161,12 +159,12 @@ View all currently enrolled students and their embedding counts:
 ```bash
 uv run python Attendance-System/main.py list
 ```
-*Outputs: Each registered student name and the number of stored face embeddings.*
+*Outputs: Each registered student's name and the number of stored face embeddings.*
 
 ---
 
 ## Key Design Decisions & Portability
 
-* **Embedded Vector Serialization**: Instead of performing linear deep learning scans on reference images at runtime, embeddings are calculated once and stored in `encodings.txt` as plain text. This speeds up matching into simple vector math executing in milliseconds and keeps the data portable across platforms.
-* **Cumulative Grid Export**: Attendance logs are organized as a spreadsheet matrix rather than a transaction log, keeping track of every registered student and their total attendance percentage over the term.
-* **OpenCV DNN Portability**: The system uses native ONNX weights supported directly by OpenCV DNN with multi-threaded inference (`cv2.setNumThreads(4)`). This enables seamless porting to other platforms, such as integrating the backend into a Flask/FastAPI REST API or loading models directly on-device using the OpenCV Android SDK or ONNX Runtime Mobile, using the exact same YuNet/SFace pipeline logic.
+* **Embedded Vector Serialisation**: Instead of performing linear deep learning scans on reference images at runtime, embeddings are calculated once and stored in `encodings.txt` as plain text. This speeds up matching into simple vector math, executing in milliseconds, and keeps the data portable across platforms.
+* **Cumulative Grid Export**: Attendance logs are organised as a spreadsheet matrix rather than a transaction log, keeping track of every registered student and their total attendance percentage over the term.
+* **OpenCV DNN Portability**: The system uses native ONNX weights supported directly by OpenCV DNN with multi-threaded inference (`cv2.setNumThreads(4)`). This enables seamless porting to other platforms, such as integrating the backend into a Flask/FastAPI REST API or loading models directly on-device using the OpenCV Android SDK or ONNX Runtime Mobile, using the same YuNet/SFace pipeline logic.
