@@ -262,6 +262,26 @@ def cmd_list_students(args):
     print()
 
 
+def cmd_unregister(args):
+    if not os.path.exists(args.encodings_file):
+        print(f"[ERROR] Encodings file not found: {args.encodings_file}")
+        return
+
+    database = load_encodings(args.encodings_file)
+    if not database:
+        print("[INFO] No students currently registered.")
+        return
+
+    if args.student_name not in database:
+        print(f"[WARNING] Student '{args.student_name}' is not registered. No action taken.")
+        return
+
+    del database[args.student_name]
+    save_encodings(database, args.encodings_file)
+    print(f"[SUCCESS] Removed '{args.student_name}' from {args.encodings_file}")
+    print(f"[INFO] {len(database)} student(s) remain registered.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="AI-Based Face Recognition Attendance System")
     subparsers = parser.add_subparsers(dest="command")
@@ -296,6 +316,10 @@ def main():
     lst = subparsers.add_parser("list", help="List all currently registered students")
     lst.add_argument("--encodings-file", default=str(_SCRIPT_DIR / "data" / "encodings.txt"))
 
+    unreg = subparsers.add_parser("unregister", help="Remove a student from the encodings database")
+    unreg.add_argument("student_name", help="Name of the student to remove")
+    unreg.add_argument("--encodings-file", default=str(_SCRIPT_DIR / "data" / "encodings.txt"))
+
     args = parser.parse_args()
 
     if args.command == "register":
@@ -306,6 +330,8 @@ def main():
         cmd_attendance(args)
     elif args.command == "list":
         cmd_list_students(args)
+    elif args.command == "unregister":
+        cmd_unregister(args)
     else:
         parser.print_help()
 

@@ -80,7 +80,7 @@ The system will automatically download the required model weights (`face_detecti
 ├── uv.lock                            # Locked dependency versions
 ├── README.md                          # Project documentation
 └── Attendance-System
-    ├── main.py                        # CLI controller (register, recognise-single, attendance, list)
+    ├── main.py                        # CLI controller (register, recognize-single, attendance, list, unregister)
     ├── evaluate.py                    # Threshold accuracy evaluation with recognise-single-support
     ├── split_dataset.py               # Splits photos 60/40 into enrollment/test for honest evaluation
     ├── setup_lfw_dataset.py           # Downloads LFW funnelled dataset for expanded testing
@@ -160,6 +160,13 @@ View all currently enrolled students and their embedding counts:
 uv run python Attendance-System/main.py list
 ```
 *Outputs: Each registered student's name and the number of stored face embeddings.*
+
+### Step 6: Unregister a Student
+Remove a student from the encodings database:
+```bash
+uv run python Attendance-System/main.py unregister "Student Name"
+```
+*Removes all embeddings for the named student from `encodings.txt`. Non-destructive — the student's dataset folder and attendance CSV history are left untouched. Re-register the student later by running `register` again.*
 
 ---
 
