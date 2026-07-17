@@ -109,7 +109,7 @@ The system will automatically download the required model weights (`face_detecti
 
 ## Usage Guide
 
-Run all commands from the workspace root directory using `uv run`.
+Run all commands using `uv run`. All file paths default relative to the script location, so commands work from any directory.
 
 ### Step 1: Student Registration (Enrollment)
 Extract face embeddings for each student located in the `dataset/` subfolders:
@@ -121,7 +121,7 @@ uv run python Attendance-System/main.py register
 ### Step 2: Test Face Recognition (Single Image)
 Test the engine against a single image to verify identity matching:
 ```bash
-uv run python Attendance-System/main.py recognize-single Attendance-System/dataset/Monica/Monica1.jpeg
+uv run python Attendance-System/main.py recognize-single Attendance-System/dataset/Tony_Blair/01.jpg
 ```
 *Outputs: Identified name, Euclidean distance score, and face detection confidence. Use `--output-json` for structured results and `--output-image` for an annotated verification image.*
 
@@ -148,7 +148,7 @@ This command automatically:
 ```bash
 uv run python Attendance-System/split_dataset.py
 ```
-*Splits each person's photos 60/40 into `dataset/` (for registration) and `test/` (for evaluation). Original full dataset is backed up.*
+*Splits each person's photos 60/40 into `dataset/` (for registration) and `test/` (for evaluation). The current dataset is backed up to `data/.dataset_backup/` before splitting.*
 
 Then evaluate with held-out test data for honest accuracy measurements:
 ```bash

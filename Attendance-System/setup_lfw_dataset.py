@@ -33,7 +33,13 @@ ENROLLMENT_FRACTION = 0.6
 def _download(url, dest):
     print(f"[INFO] Downloading {dest.name} ({_LFW_URL})...")
     try:
-        urllib.request.urlretrieve(url, dest)
+        with urllib.request.urlopen(url) as response:
+            with open(dest, 'wb') as out:
+                while True:
+                    chunk = response.read(8192)
+                    if not chunk:
+                        break
+                    out.write(chunk)
     except Exception as e:
         print(f"[ERROR] Download failed: {e}")
         print(f"  You can manually download from: {_LFW_URL}")

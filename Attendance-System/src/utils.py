@@ -4,8 +4,11 @@ import hashlib
 import urllib.request
 import csv
 from datetime import datetime
+from pathlib import Path
 import numpy as np
 import cv2
+
+_SCRIPT_DIR = Path(__file__).resolve().parent.parent
 
 YUNET_URL = "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx"
 SFACE_URL = "https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx"
@@ -90,7 +93,7 @@ def _sha256(filepath):
     return h.hexdigest()
 
 
-def load_models(models_dir="Attendance-System/models"):
+def load_models(models_dir=str(_SCRIPT_DIR / "models")):
     os.makedirs(models_dir, exist_ok=True)
     yunet_path = os.path.join(models_dir, "face_detection_yunet_2023mar.onnx")
     sface_path = os.path.join(models_dir, "face_recognition_sface_2021dec.onnx")
@@ -101,7 +104,7 @@ def load_models(models_dir="Attendance-System/models"):
     return yunet_path, sface_path
 
 
-def save_encodings(encodings, filepath="Attendance-System/data/encodings.txt"):
+def save_encodings(encodings, filepath=str(_SCRIPT_DIR / "data" / "encodings.txt")):
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, 'w') as f:
         for student_name, embeddings in encodings.items():
@@ -113,7 +116,7 @@ def save_encodings(encodings, filepath="Attendance-System/data/encodings.txt"):
     print(f"[INFO] Saved {len(encodings)} student encodings to {filepath}")
 
 
-def load_encodings(filepath="Attendance-System/data/encodings.txt"):
+def load_encodings(filepath=str(_SCRIPT_DIR / "data" / "encodings.txt")):
     if not os.path.exists(filepath):
         print(f"[WARNING] Encodings file {filepath} not found. Please register students first.")
         return {}
@@ -149,7 +152,7 @@ def load_encodings(filepath="Attendance-System/data/encodings.txt"):
     return encodings
 
 
-def save_attendance(present_students, filepath="Attendance-System/data/attendance.csv", database_filepath="Attendance-System/data/encodings.txt"):
+def save_attendance(present_students, filepath=str(_SCRIPT_DIR / "data" / "attendance.csv"), database_filepath=str(_SCRIPT_DIR / "data" / "encodings.txt")):
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
     database = load_encodings(database_filepath)
