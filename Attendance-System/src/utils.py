@@ -104,12 +104,26 @@ def load_models(models_dir=str(_SCRIPT_DIR / "models")):
     return yunet_path, sface_path
 
 
-def save_encodings(encodings, filepath=str(_SCRIPT_DIR / "data" / "encodings.txt")):
+def save_encodings(encodings, names_map, filepath=str(_SCRIPT_DIR / "data" / "encodings.txt")):
+    """Persist face embeddings to a plain-text file.
+
+    encodings  — dict {roll_number: [embedding, ...]}
+    names_map  — dict {roll_number: display_name}
+
+    Format on disk:
+        #<roll>|<display_name>
+        <128 space-separated floats>
+        ...
+    """
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, 'w') as f:
-        for student_name, embeddings in encodings.items():
-            safe_name = student_name.replace("#", "_").replace("\n", " ").replace("\r", "")
-            f.write(f"#{safe_name}\n")
+        for roll, embeddings in encodings.items():
+            if roll not in names_map:
+                print(f"[WARNING] save_encodings: no display name for roll '{roll}' — using roll number as name.")
+            display_name = names_map.get(roll, roll)
+            safe_roll = str(roll).replace("#", "_").replace("|", "_").replace("\n", "").replace("\r", "")
+            safe_name = display_name.replace("#", "_").replace("|", "_").replace("\n", " ").replace("\r", "")
+            f.write(f"#{safe_roll}|{safe_name}\n")
             for embedding in embeddings:
                 line = " ".join(str(v) for v in embedding.flatten())
                 f.write(line + "\n")
@@ -117,11 +131,21 @@ def save_encodings(encodings, filepath=str(_SCRIPT_DIR / "data" / "encodings.txt
 
 
 def load_encodings(filepath=str(_SCRIPT_DIR / "data" / "encodings.txt")):
+    """Load face embeddings from disk.
+
+    Returns a tuple:
+        encodings  — dict {roll_number: [embedding, ...]}
+        names_map  — dict {roll_number: display_name}
+
+    Header format: #<roll>|<display_name>
+    Legacy format (#<name> with no pipe) is rejected with a clear error message.
+    """
     if not os.path.exists(filepath):
         print(f"[WARNING] Encodings file {filepath} not found. Please register students first.")
-        return {}
+        return {}, {}
     encodings = {}
-    current_name = None
+    names_map = {}
+    current_roll = None
     line_number = 0
     skipped = 0
     with open(filepath, 'r') as f:
@@ -131,36 +155,53 @@ def load_encodings(filepath=str(_SCRIPT_DIR / "data" / "encodings.txt")):
             if not line:
                 continue
             if line.startswith('#'):
-                current_name = line[1:]
-                if current_name in encodings:
-                    print(f"[WARNING] Duplicate student name '{current_name}' at line {line_number} — overwriting previous embeddings.")
-                encodings[current_name] = []
-            elif current_name is not None:
+                header = line[1:]
+                if '|' not in header:
+                    print(
+                        f"[ERROR] Encodings file uses legacy name-only format (line {line_number}: '{line}'). "
+                        "Re-register all students with the updated pipeline."
+                    )
+                    return {}, {}
+                parts = header.split('|', 1)
+                current_roll = parts[0].strip()
+                display_name = parts[1].strip()
+                if current_roll in encodings:
+                    print(f"[WARNING] Duplicate roll '{current_roll}' at line {line_number} — overwriting previous embeddings.")
+                encodings[current_roll] = []
+                names_map[current_roll] = display_name
+            elif current_roll is not None:
                 try:
                     values = np.array([float(x) for x in line.split()], dtype=np.float32)
                 except ValueError:
                     skipped += 1
-                    print(f"[WARNING] Skipping non-numeric line at line {line_number} for '{current_name}'.")
+                    print(f"[WARNING] Skipping non-numeric line at line {line_number} for roll '{current_roll}'.")
                     continue
                 if len(values) == 128:
-                    encodings[current_name].append(values.reshape(1, 128))
+                    encodings[current_roll].append(values.reshape(1, 128))
                 else:
                     skipped += 1
-                    print(f"[WARNING] Skipping malformed embedding at line {line_number} for '{current_name}': expected 128 values, got {len(values)}.")
+                    print(f"[WARNING] Skipping malformed embedding at line {line_number} for roll '{current_roll}': expected 128 values, got {len(values)}.")
     if skipped > 0:
         print(f"[WARNING] {skipped} embedding line(s) were skipped due to unexpected length.")
-    return encodings
+    return encodings, names_map
 
 
-def save_attendance(present_students, filepath=str(_SCRIPT_DIR / "data" / "attendance.csv"), database_filepath=str(_SCRIPT_DIR / "data" / "encodings.txt")):
+def save_attendance(present_students, filepath=str(_SCRIPT_DIR / "data" / "attendance.csv"),
+                    database_filepath=str(_SCRIPT_DIR / "data" / "encodings.txt")):
+    """Write cumulative attendance matrix CSV.
+
+    present_students — dict {roll_number: display_name} for students present today.
+    CSV columns: Roll Number | Name | <date> ... | Percentage of total lectures attended
+    """
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
-    database = load_encodings(database_filepath)
-    if not database:
+    encodings, names_map = load_encodings(database_filepath)
+    if not encodings:
         print("[WARNING] No registered students found in encodings database. Skipping CSV export.")
         return
 
-    all_students = sorted(list(database.keys()))
+    # Canonical order: by roll number
+    all_rolls = sorted(encodings.keys())
 
     now = datetime.now()
     date_str = now.strftime("%d-%m-%Y")
@@ -169,12 +210,13 @@ def save_attendance(present_students, filepath=str(_SCRIPT_DIR / "data" / "atten
     header = []
 
     if not os.path.exists(filepath):
-        header = ["Names", date_str, "Percentage of total lectures attended"]
+        header = ["Roll Number", "Name", date_str, "Percentage of total lectures attended"]
         rows.append(header)
-        for student in all_students:
-            status = "P" if student in present_students else "A"
+        for roll in all_rolls:
+            name = names_map.get(roll, roll)
+            status = "P" if roll in present_students else "A"
             pct_str = "100.0%" if status == "P" else "0.0%"
-            rows.append([student, status, pct_str])
+            rows.append([roll, name, status, pct_str])
     else:
         with open(filepath, mode='r', newline='', encoding='utf-8') as f:
             reader = csv.reader(f)
@@ -182,7 +224,7 @@ def save_attendance(present_students, filepath=str(_SCRIPT_DIR / "data" / "atten
 
         if not rows:
             print("[WARNING] Existing attendance CSV is empty — reinitializing with fresh header. Prior history will be lost.")
-            header = ["Names", date_str, "Percentage of total lectures attended"]
+            header = ["Roll Number", "Name", date_str, "Percentage of total lectures attended"]
             rows.append(header)
         else:
             header = rows[0]
@@ -202,27 +244,30 @@ def save_attendance(present_students, filepath=str(_SCRIPT_DIR / "data" / "atten
             date_col_idx = pct_col_idx
             new_col_inserted = True
 
-        existing_names = set()
+        existing_rolls = set()
         for row in rows[1:]:
             if not row or len(row) == 0:
                 continue
-            student_name = row[0]
-            existing_names.add(student_name)
+            roll = row[0]
+            existing_rolls.add(roll)
 
             if new_col_inserted:
                 row.insert(date_col_idx, "A")
 
-            if student_name in present_students:
+            if roll in present_students:
                 row[date_col_idx] = "P"
             else:
                 row[date_col_idx] = "A"
 
-        for student in all_students:
-            if student not in existing_names:
-                new_row = [student]
-                for col_idx in range(1, len(header) - 1):
+        for roll in all_rolls:
+            if roll not in existing_rolls:
+                name = names_map.get(roll, roll)
+                new_row = [roll, name]
+                # date columns start at index 2 (after Roll Number and Name)
+                date_cols_start = 2
+                for col_idx in range(date_cols_start, len(header) - 1):
                     if col_idx == date_col_idx:
-                        new_row.append("P" if student in present_students else "A")
+                        new_row.append("P" if roll in present_students else "A")
                     else:
                         new_row.append("A")
                 new_row.append("")
@@ -231,8 +276,9 @@ def save_attendance(present_students, filepath=str(_SCRIPT_DIR / "data" / "atten
         for row in rows[1:]:
             if not row or len(row) == 0:
                 continue
-            total_days = len(header) - 2
-            p_count = row[1:-1].count("P")
+            # Date columns are between index 2 and the last column (percentage)
+            total_days = len(header) - 3  # subtract Roll Number, Name, Percentage
+            p_count = row[2:-1].count("P")
             pct = (p_count / total_days) * 100 if total_days > 0 else 0.0
             row[-1] = f"{pct:.1f}%"
 

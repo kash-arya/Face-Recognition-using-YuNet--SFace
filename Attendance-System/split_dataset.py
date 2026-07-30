@@ -12,7 +12,8 @@ This creates:
 Each person's photos are split 60/40 enrollment/test (minimum 1 test photo).
 If a person has only 1 photo, they stay enrollment-only (no held-out evaluation).
 
-To add more people: place their photos in dataset/{PersonName}/ and re-run this script.
+Folder naming convention: {roll}_{display_name}  (e.g. 101_Ariel_Sharon/)
+To add more people: place their photos in dataset/{roll}_{Name}/ and re-run this script.
 """
 
 import sys
@@ -104,7 +105,7 @@ def main():
     print(f"  uv run python Attendance-System/main.py register")
     print(f"  uv run python Attendance-System/evaluate.py --test-dir {TEST_DIR}")
     print(f"\nTo add more people:")
-    print(f"  Place photos in {DATASET_SRC}/NEW_NAME/ and re-run this script.")
+    print(f"  Place photos in {DATASET_SRC}/{{roll}}_{{Name}}/ and re-run this script.")
 
 
 if __name__ == "__main__":

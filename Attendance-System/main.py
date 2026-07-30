@@ -16,9 +16,13 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 
 def _setup_engine_and_db(args):
     yunet_path, sface_path = load_models(args.models_dir)
-    engine = FaceRecognitionEngine(yunet_path, sface_path, distance_threshold=args.threshold)
-    database = load_encodings(args.encodings_file)
-    return engine, database
+    engine = FaceRecognitionEngine(
+        yunet_path, sface_path,
+        distance_threshold=args.threshold,
+        min_pitch_ratio=getattr(args, 'min_pitch_ratio', 0.05),
+    )
+    encodings, names_map = load_encodings(args.encodings_file)
+    return engine, encodings, names_map
 
 
 def _read_image(path):
@@ -49,24 +53,38 @@ def _timestamped_path(filepath):
 
 def cmd_register(args):
     yunet_path, sface_path = load_models(args.models_dir)
-    engine = FaceRecognitionEngine(yunet_path, sface_path)
+    engine = FaceRecognitionEngine(
+        yunet_path, sface_path,
+        min_pitch_ratio=args.min_pitch_ratio,
+    )
 
     if not os.path.exists(args.dataset_dir):
         print(f"[ERROR] Dataset directory not found: {args.dataset_dir}")
         return
 
     if os.path.exists(args.encodings_file):
-        encodings_db = load_encodings(args.encodings_file)
+        encodings_db, names_map = load_encodings(args.encodings_file)
         print(f"[INFO] Loaded {len(encodings_db)} existing student(s) from {args.encodings_file}")
     else:
         encodings_db = {}
+        names_map = {}
 
     for item in os.listdir(args.dataset_dir):
         student_path = os.path.join(args.dataset_dir, item)
         if not os.path.isdir(student_path):
             continue
 
-        print(f"\n[INFO] Enrolling student: {item}")
+        # Parse folder name: "{roll}_{display_name}" — split on first underscore
+        if '_' not in item:
+            print(f"[WARNING] Folder '{item}' does not follow '{{roll}}_{{name}}' convention. Skipping.")
+            continue
+        roll, display_name = item.split('_', 1)
+        if not roll.isdigit():
+            print(f"[WARNING] Folder '{item}' has non-numeric roll '{roll}'. Roll must be digits only. Skipping.")
+            continue
+        display_name = display_name.replace('_', ' ')  # restore spaces for display
+
+        print(f"\n[INFO] Enrolling: {roll} - {display_name}")
         embeddings = []
 
         for file_name in os.listdir(student_path):
@@ -117,20 +135,21 @@ def cmd_register(args):
                 print(f"    Added {num_augmented} embeddings (original + {num_augmented - 1} augmented)")
 
         if embeddings:
-            encodings_db[item] = embeddings
-            print(f"[SUCCESS] Registered {item} with {len(embeddings)} faces.")
+            encodings_db[roll] = embeddings
+            names_map[roll] = display_name
+            print(f"[SUCCESS] Registered {roll} - {display_name} with {len(embeddings)} faces.")
         else:
-            print(f"[WARNING] No valid face embeddings found for {item}.")
+            print(f"[WARNING] No valid face embeddings found for {roll} - {display_name}.")
 
     if encodings_db:
-        save_encodings(encodings_db, args.encodings_file)
+        save_encodings(encodings_db, names_map, args.encodings_file)
     else:
         print("[ERROR] No students registered. Database is empty.")
 
 
 def cmd_recognize_single(args):
-    engine, database = _setup_engine_and_db(args)
-    if not database:
+    engine, encodings, names_map = _setup_engine_and_db(args)
+    if not encodings:
         print("[ERROR] No student encodings found. Please run the 'register' command first.")
         return
 
@@ -155,15 +174,18 @@ def cmd_recognize_single(args):
     # Pick the single best face by detection confidence
     best_face = max(faces, key=lambda f: f[14])
     embedding = engine.extract_embedding(image, best_face)
-    name, distance = engine.match_face(embedding, database)
+    roll, distance = engine.match_face(embedding, encodings)
+    display = f"{roll} - {names_map[roll]}" if roll != "Unknown" else "Unknown"
 
-    print(f"[RESULT] {name}  (Distance: {distance:.3f}, Detection Confidence: {best_face[14]:.3f})")
+    print(f"[RESULT] {display}  (Distance: {distance:.3f}, Detection Confidence: {best_face[14]:.3f})")
 
     if args.output_json:
         result = {
             "image": args.image_path,
             "result": {
-                "name": name,
+                "roll": roll,
+                "name": names_map.get(roll, ""),
+                "display": display,
                 "distance": round(float(distance), 3),
                 "detection_confidence": round(float(best_face[14]), 3),
             }
@@ -177,14 +199,14 @@ def cmd_recognize_single(args):
     if args.output_image:
         output_path = _timestamped_path(args.output_image)
         os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else ".", exist_ok=True)
-        annotated = draw_face_annotations(image, np.array([best_face]), [name], [distance])
+        annotated = draw_face_annotations(image, np.array([best_face]), [display], [distance])
         cv2.imwrite(output_path, annotated)
         print(f"[INFO] Saved annotated verification image to: {output_path}")
 
 
 def cmd_attendance(args):
-    engine, database = _setup_engine_and_db(args)
-    if not database:
+    engine, encodings, names_map = _setup_engine_and_db(args)
+    if not encodings:
         print("[ERROR] No student encodings found. Please run the 'register' command first.")
         return
 
@@ -199,25 +221,29 @@ def cmd_attendance(args):
     faces = _filter_faces(faces, args.min_confidence)
     total_headcount = len(faces)
 
-    present = set()
-    match_names = []
+    # present: dict {roll: display_name}
+    present = {}
+    match_labels = []
     distances = []
 
     if total_headcount > 0:
         for face in faces:
             embedding = engine.extract_embedding(image, face)
-            name, distance = engine.match_face(embedding, database)
-            match_names.append(name)
+            roll, distance = engine.match_face(embedding, encodings)
+            if roll != "Unknown":
+                display = f"{roll} - {names_map[roll]}"
+                present[roll] = names_map[roll]
+            else:
+                display = "Unknown"
+            match_labels.append(display)
             distances.append(distance)
-            if name != "Unknown":
-                present.add(name)
 
     print("\n--- ATTENDANCE REPORT ---")
     print(f"Total Headcount: {total_headcount}")
     print("Present Students:")
     if present:
-        for name in sorted(present):
-            print(f" - {name}")
+        for roll in sorted(present):
+            print(f" - {roll} - {present[roll]}")
     else:
         print("  None")
         if total_headcount > 0:
@@ -230,9 +256,12 @@ def cmd_attendance(args):
         result = {
             "date": datetime.now().strftime("%d-%m-%Y"),
             "total_headcount": total_headcount,
-            "present": sorted(present),
+            "present": [
+                {"roll": r, "name": n} for r, n in sorted(present.items())
+            ],
             "detections": [
-                {"name": n, "distance": round(float(d), 3)} for n, d in zip(match_names, distances)
+                {"label": lbl, "distance": round(float(d), 3)}
+                for lbl, d in zip(match_labels, distances)
             ]
         }
         json_path = os.path.abspath(args.output_json)
@@ -244,21 +273,24 @@ def cmd_attendance(args):
     if total_headcount > 0 and args.output_image:
         output_path = _timestamped_path(args.output_image)
         os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else ".", exist_ok=True)
-        annotated = draw_face_annotations(image, faces, match_names, distances)
+        annotated = draw_face_annotations(image, faces, match_labels, distances)
         cv2.imwrite(output_path, annotated)
         print(f"[INFO] Saved annotated verification image to: {output_path}")
 
 
 def cmd_list_students(args):
-    database = load_encodings(args.encodings_file)
-    if not database:
+    encodings, names_map = load_encodings(args.encodings_file)
+    if not encodings:
         print("[INFO] No students currently registered.")
         return
 
-    print(f"\n{len(database)} registered student(s):\n")
-    for name in sorted(database.keys()):
-        count = len(database[name])
-        print(f"  {name}  ({count} embedding{'s' if count != 1 else ''})")
+    print(f"\n{len(encodings)} registered student(s):\n")
+    print(f"  {'Roll':<8}  {'Name':<35}  Embeddings")
+    print(f"  {'-'*8}  {'-'*35}  ----------")
+    for roll in sorted(encodings.keys()):
+        name = names_map.get(roll, roll)
+        count = len(encodings[roll])
+        print(f"  {roll:<8}  {name:<35}  {count}")
     print()
 
 
@@ -267,19 +299,22 @@ def cmd_unregister(args):
         print(f"[ERROR] Encodings file not found: {args.encodings_file}")
         return
 
-    database = load_encodings(args.encodings_file)
-    if not database:
+    encodings, names_map = load_encodings(args.encodings_file)
+    if not encodings:
         print("[INFO] No students currently registered.")
         return
 
-    if args.student_name not in database:
-        print(f"[WARNING] Student '{args.student_name}' is not registered. No action taken.")
+    roll = args.roll_number
+    if roll not in encodings:
+        print(f"[WARNING] Roll number '{roll}' is not registered. No action taken.")
         return
 
-    del database[args.student_name]
-    save_encodings(database, args.encodings_file)
-    print(f"[SUCCESS] Removed '{args.student_name}' from {args.encodings_file}")
-    print(f"[INFO] {len(database)} student(s) remain registered.")
+    display = f"{roll} - {names_map.get(roll, roll)}"
+    del encodings[roll]
+    del names_map[roll]
+    save_encodings(encodings, names_map, args.encodings_file)
+    print(f"[SUCCESS] Removed '{display}' from {args.encodings_file}")
+    print(f"[INFO] {len(encodings)} student(s) remain registered.")
 
 
 def main():
@@ -292,7 +327,9 @@ def main():
     reg.add_argument("--encodings-file", default=str(_SCRIPT_DIR / "data" / "encodings.txt"))
     reg.add_argument("--min-confidence", type=float, default=0.85, help="Minimum face detection confidence to accept")
     reg.add_argument("--no-augmentation", action="store_true", help="Skip Gaussian blur augmentation (faster, less robust)")
-    reg.add_argument("--no-quality-check", action="store_true", help="Skip face quality gate (tilt, size) during registration")
+    reg.add_argument("--no-quality-check", action="store_true", help="Skip face quality gate (tilt, size, pitch) during registration")
+    reg.add_argument("--min-pitch-ratio", type=float, default=0.05,
+                     help="Minimum nose-to-eye vertical ratio for pitch quality check (default: 0.05)")
 
     rec = subparsers.add_parser("recognize-single", help="Recognize a single face image")
     rec.add_argument("image_path")
@@ -317,7 +354,7 @@ def main():
     lst.add_argument("--encodings-file", default=str(_SCRIPT_DIR / "data" / "encodings.txt"))
 
     unreg = subparsers.add_parser("unregister", help="Remove a student from the encodings database")
-    unreg.add_argument("student_name", help="Name of the student to remove")
+    unreg.add_argument("roll_number", help="Roll number of the student to remove (e.g. 101)")
     unreg.add_argument("--encodings-file", default=str(_SCRIPT_DIR / "data" / "encodings.txt"))
 
     args = parser.parse_args()

@@ -25,12 +25,29 @@ def _extract_query_embedding(engine, img_path):
     return engine.extract_embedding(image, best_face)
 
 
-def _process_query_photos(engine, database, photo_dir, query_student_name):
+def _find_student_folder(photo_dir, roll):
+    """Find the folder for a given roll number by scanning photo_dir.
+
+    Matches any directory whose name starts with '{roll}_', avoiding the
+    fragility of reconstructing the original folder name from the display name.
+    Returns the absolute path, or None if not found.
+    """
+    prefix = f"{roll}_"
+    try:
+        for entry in os.scandir(photo_dir):
+            if entry.is_dir() and entry.name.startswith(prefix):
+                return entry.path
+    except FileNotFoundError:
+        pass
+    return None
+
+
+def _process_query_photos(engine, database, names_map, photo_dir, query_roll):
     same_person = []
     diff_person = []
 
-    student_folder = os.path.join(photo_dir, query_student_name)
-    if not os.path.isdir(student_folder):
+    student_folder = _find_student_folder(photo_dir, query_roll)
+    if student_folder is None:
         return same_person, diff_person
 
     for file_name in os.listdir(student_folder):
@@ -42,10 +59,10 @@ def _process_query_photos(engine, database, photo_dir, query_student_name):
         if query_embedding is None:
             continue
 
-        for student_name, embeddings in database.items():
+        for roll, embeddings in database.items():
             for ref_embedding in embeddings:
                 dist = engine.compute_distance(query_embedding, ref_embedding)
-                if student_name == query_student_name:
+                if roll == query_roll:
                     same_person.append(dist)
                 else:
                     diff_person.append(dist)
@@ -102,12 +119,12 @@ def evaluate_distance_distribution(args):
     yunet_path, sface_path = load_models(args.models_dir)
     engine = FaceRecognitionEngine(yunet_path, sface_path)
 
-    database = load_encodings(args.encodings_file)
-    if not database:
+    encodings, names_map = load_encodings(args.encodings_file)
+    if not encodings:
         print("[ERROR] No encodings found. Run 'register' first.")
         return
 
-    known_students = sorted(database.keys())
+    known_rolls = sorted(encodings.keys())
 
     if args.test_dir is not None:
         test_dir_path = Path(args.test_dir)
@@ -118,18 +135,18 @@ def evaluate_distance_distribution(args):
         print(f"[INFO] Using held-out test photos from {args.test_dir} (no data leakage)")
         photo_dir = str(test_dir_path)
         skipped = []
-        for name in known_students:
-            student_test_folder = test_dir_path / name
-            if not student_test_folder.is_dir():
-                skipped.append(name)
+        for roll in known_rolls:
+            if _find_student_folder(str(test_dir_path), roll) is None:
+                skipped.append(roll)
 
         if skipped:
-            print(f"[WARNING] No test photos found for: {', '.join(skipped)}")
+            skipped_labels = [f"{r} ({names_map.get(r, r)})" for r in skipped]
+            print(f"[WARNING] No test photos found for: {', '.join(skipped_labels)}")
             print("  These students will be excluded from same-person evaluation.")
             print("  Different-person distances still include them.")
-            known_students = [n for n in known_students if n not in skipped]
+            known_rolls = [r for r in known_rolls if r not in skipped]
 
-        if not known_students:
+        if not known_rolls:
             print("[ERROR] No students have test photos. Add held-out photos to the test directory.")
             return
     else:
@@ -143,14 +160,15 @@ def evaluate_distance_distribution(args):
     same_person = []
     diff_person = []
 
-    for name in known_students:
-        s, d = _process_query_photos(engine, database, photo_dir, name)
+    for roll in known_rolls:
+        s, d = _process_query_photos(engine, encodings, names_map, photo_dir, roll)
         same_person.extend(s)
         diff_person.extend(d)
+        display = names_map.get(roll, roll)
         if not s:
-            print(f"  [WARNING] No valid test faces found for '{name}'")
+            print(f"  [WARNING] No valid test faces found for '{roll} - {display}'")
         else:
-            print(f"  {name}: {len(s)} same-person, {len(d)} different-person comparisons")
+            print(f"  {roll} - {display}: {len(s)} same-person, {len(d)} different-person comparisons")
 
     if not same_person:
         print("\n[ERROR] No same-person distances computed. Check test photos.")
@@ -178,7 +196,7 @@ def main():
         "--test-dir",
         default=None,
         help="Directory with held-out test photos NOT used during registration "
-             "(format: test/{PersonName}/*.jpg). "
+             "(format: test/{roll}_{Name}/*.jpg). "
              "Using this avoids data leakage."
     )
     parser.add_argument("--models-dir", default=str(_SCRIPT_DIR / "models"))

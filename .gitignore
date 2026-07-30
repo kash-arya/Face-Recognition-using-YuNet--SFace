@@ -32,3 +32,5 @@ Thumbs.db
 
 # Docs (local only)
 docs/
+.agents/
+.commandcode/
