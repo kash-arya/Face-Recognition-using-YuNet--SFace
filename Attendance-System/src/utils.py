@@ -114,20 +114,40 @@ def save_encodings(encodings, names_map, filepath=str(_SCRIPT_DIR / "data" / "en
         #<roll>|<display_name>
         <128 space-separated floats>
         ...
+
+    Write strategy: content is written to a .tmp file first, then atomically
+    renamed into place with os.replace() so a mid-write crash never leaves a
+    truncated or corrupt encodings file.
     """
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    with open(filepath, 'w') as f:
-        for roll, embeddings in encodings.items():
-            if roll not in names_map:
-                print(f"[WARNING] save_encodings: no display name for roll '{roll}' — using roll number as name.")
-            display_name = names_map.get(roll, roll)
-            safe_roll = str(roll).replace("#", "_").replace("|", "_").replace("\n", "").replace("\r", "")
-            safe_name = display_name.replace("#", "_").replace("|", "_").replace("\n", " ").replace("\r", "")
-            f.write(f"#{safe_roll}|{safe_name}\n")
-            for embedding in embeddings:
-                line = " ".join(str(v) for v in embedding.flatten())
-                f.write(line + "\n")
+    tmp_path = filepath + ".tmp"
+    try:
+        with open(tmp_path, 'w') as f:
+            for roll, embeddings in encodings.items():
+                if roll not in names_map:
+                    print(f"[WARNING] save_encodings: no display name for roll '{roll}' — using roll number as name.")
+                display_name = names_map.get(roll, roll)
+                safe_roll = str(roll).replace("#", "_").replace("|", "_").replace("\n", "").replace("\r", "")
+                safe_name = display_name.replace("#", "_").replace("|", "_").replace("\n", " ").replace("\r", "")
+                f.write(f"#{safe_roll}|{safe_name}\n")
+                for embedding in embeddings:
+                    line = " ".join(str(v) for v in embedding.flatten())
+                    f.write(line + "\n")
+        os.replace(tmp_path, filepath)
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
+
     print(f"[INFO] Saved {len(encodings)} student encodings to {filepath}")
+
+    # Post-save verification: reload and confirm all rolls are present
+    verified, _ = load_encodings(filepath)
+    missing = [r for r in encodings if r not in verified]
+    if missing:
+        print(f"[WARNING] save_encodings verification failed: rolls {missing} are missing from the saved file.")
+    else:
+        print(f"[INFO] Verification passed: all {len(encodings)} roll(s) confirmed in saved file.")
 
 
 def load_encodings(filepath=str(_SCRIPT_DIR / "data" / "encodings.txt")):
@@ -284,11 +304,30 @@ def save_attendance(present_students, filepath=str(_SCRIPT_DIR / "data" / "atten
 
         _validate_csv_rows(header, rows[1:])
 
-    with open(filepath, mode='w', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        writer.writerows(rows)
+    tmp_path = filepath + ".tmp"
+    try:
+        with open(tmp_path, mode='w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerows(rows)
+        os.replace(tmp_path, filepath)
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
 
     print(f"[INFO] Exported matrix attendance to {filepath}")
+
+    # Post-save verification: reload CSV and confirm all expected rolls are present
+    with open(filepath, mode='r', newline='', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        saved_rows = list(reader)
+    saved_rolls = {row[0] for row in saved_rows[1:] if row}
+    missing = [r for r in all_rolls if r not in saved_rolls]
+    if missing:
+        print(f"[WARNING] save_attendance verification failed: rolls {missing} are missing from the saved CSV.")
+    else:
+        print(f"[INFO] Verification passed: all {len(all_rolls)} roll(s) confirmed in saved CSV.")
+
 
 
 def _validate_csv_rows(header, data_rows):
